@@ -579,22 +579,11 @@
         }
 
         try {
-          try {
-            bleDevice = await navigator.bluetooth.requestDevice({
-              filters: [{ services: [NUS_SERVICE_UUID] }],
-              optionalServices: [NUS_SERVICE_UUID],
-            });
-          } catch (filteredErr) {
-            logBT(
-              "Filtered chooser failed:",
-              filteredErr,
-              "Falling back to acceptAllDevices"
-            );
-            bleDevice = await navigator.bluetooth.requestDevice({
-              acceptAllDevices: true,
-              optionalServices: [NUS_SERVICE_UUID],
-            });
-          }
+          // Open a broad device chooser so the user sees all nearby BLE devices immediately.
+          // Using acceptAllDevices avoids showing an empty filtered picker on some devices/browsers.
+          bleDevice = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+          });
 
           if (!bleDevice) {
             updateBTStatus("no-device");
