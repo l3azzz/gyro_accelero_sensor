@@ -1,239 +1,668 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>BLE test — Web Bluetooth diagnostics</title>
+    <title>IMU Live — gyro & accel</title>
     <style>
+      :root {
+        --bg: #0f1724;
+        --card: #0b1420;
+        --accent: #06b6d4;
+        --muted: #9ca3af;
+        color-scheme: dark;
+      }
+      html,
       body {
-        font-family: system-ui, Arial;
-        margin: 18px;
-        background: #071020;
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+          Arial;
+        background: linear-gradient(180deg, #071020 0%, #051826 100%);
         color: #e6eef6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      .wrap {
+        max-width: 760px;
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 18px;
+      }
+      .panel {
+        background: rgba(255, 255, 255, 0.02);
+        padding: 14px;
+        border-radius: 10px;
+        box-shadow: 0 6px 18px rgba(2, 6, 23, 0.6);
+      }
+      .left {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .dot-area {
+        flex: 1;
+        position: relative;
+        min-height: 280px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          transparent
+        );
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .dot {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent), #7c3aed);
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 8px 20px rgba(6, 182, 212, 0.12),
+          inset 0 -6px 18px rgba(255, 255, 255, 0.04);
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
       }
       button {
-        padding: 10px 14px;
-        margin: 6px;
-        border-radius: 8px;
-        background: #06202a;
-        color: #cfeff4;
+        background: transparent;
         border: 1px solid rgba(255, 255, 255, 0.06);
-      }
-      .log {
-        margin-top: 12px;
-        padding: 12px;
-        background: rgba(255, 255, 255, 0.02);
+        color: inherit;
+        padding: 8px 12px;
         border-radius: 8px;
-        max-width: 720px;
-        word-break: break-word;
       }
-      .hint {
-        color: #9ca3af;
-        font-size: 0.95rem;
-        margin-top: 8px;
+      .small {
+        font-size: 13px;
+        color: var(--muted);
       }
-      .ok {
-        color: #7ee6b8;
+      .readouts {
+        display: grid;
+        gap: 8px;
       }
-      .bad {
-        color: #ff9b9b;
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: monospace;
+      }
+      .col-right {
+        padding-left: 10px;
+      }
+      .notes {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      @media (max-width: 860px) {
+        .wrap {
+          grid-template-columns: 1fr;
+        }
+        .left {
+          order: 2;
+        }
+        .panel.right {
+          order: 1;
+        }
       }
     </style>
   </head>
   <body>
-    <h2>Web Bluetooth diagnostics</h2>
-    <div>
-      <button id="check">Check support</button>
-      <button id="connect">Connect BLE (chooser)</button>
-      <button id="disconnect" disabled>Disconnect</button>
+    <div class="wrap">
+      <div class="panel left">
+        <div class="controls">
+          <button id="start">Start Sensors</button>
+          <button id="stop" disabled>Stop</button>
+          <button id="btConnect">Connect Bluetooth</button>
+          <button id="btDisconnect" disabled>Disconnect BT</button>
+          <button id="simulate">Simulate Motion</button>
+          <div class="small" id="status">idle</div>
+          <div class="small" id="btStatus" style="margin-left: 8px">
+            BT: disconnected
+          </div>
+          <div
+            id="btLog"
+            class="small"
+            style="margin-left: 8px; max-width: 260px; word-break: break-word"
+          ></div>
+          <div
+            id="permStatus"
+            class="small"
+            style="margin-left: 8px; max-width: 260px; word-break: break-word"
+          >
+            Perm: unknown
+          </div>
+          <div
+            id="sensorLog"
+            class="small"
+            style="margin-left: 8px; max-width: 260px; word-break: break-word"
+          >
+            Sensor: idle
+          </div>
+        </div>
+
+        <div class="dot-area" id="stage">
+          <div class="dot" id="dot"></div>
+        </div>
+
+        <div class="notes small">
+          Tip: open this page in Chrome on your Android phone over HTTPS. If
+          sensors are blocked, serve the page via HTTPS and check site
+          permissions.
+        </div>
+      </div>
+
+      <div class="panel right">
+        <h3 style="margin: 0 0 10px 0">Live sensor readout</h3>
+        <div class="readouts">
+          s
+          <div class="row">
+            <div>Accel X</div>
+            <div class="col-right" id="ax">—</div>
+          </div>
+          <div class="row">
+            <div>Accel Y</div>
+            <div class="col-right" id="ay">—</div>
+          </div>
+          <div class="row">
+            <div>Accel Z</div>
+            <div class="col-right" id="az">—</div>
+          </div>
+          <div style="height: 8px"></div>
+          <div class="row">
+            <div>Gyro X</div>
+            <div class="col-right" id="gx">—</div>
+          </div>
+          <div class="row">
+            <div>Gyro Y</div>
+            <div class="col-right" id="gy">—</div>
+          </div>
+          <div class="row">
+            <div>Gyro Z</div>
+            <div class="col-right" id="gz">—</div>
+          </div>
+          <div style="height: 8px"></div>
+          <div class="row">
+            <div>Source</div>
+            <div class="col-right" id="source">—</div>
+          </div>
+          <div class="row">
+            <div>Timestamp</div>
+            <div class="col-right" id="ts">—</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="hint" id="contextInfo"></div>
-    <div class="log" id="log">Log: idle</div>
-
     <script>
-      const logEl = document.getElementById("log");
-      const ctxEl = document.getElementById("contextInfo");
-      const checkBtn = document.getElementById("check");
-      const connectBtn = document.getElementById("connect");
-      const disconnectBtn = document.getElementById("disconnect");
+      // Small helper: format numbers
+      const fmt = (v, n = 2) => (typeof v === "number" ? v.toFixed(n) : "—");
 
-      function log(...args) {
-        const s = args
-          .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
-          .join(" ");
-        console.log("BLE:", s);
-        logEl.textContent = "Log: " + s;
-      }
+      const startBtn = document.getElementById("start");
+      const stopBtn = document.getElementById("stop");
+      const statusEl = document.getElementById("status");
+      const dot = document.getElementById("dot");
+      const stage = document.getElementById("stage");
 
-      function setContext(msg) {
-        ctxEl.innerHTML = msg;
-      }
+      const ax = document.getElementById("ax");
+      const ay = document.getElementById("ay");
+      const az = document.getElementById("az");
+      const gx = document.getElementById("gx");
+      const gy = document.getElementById("gy");
+      const gz = document.getElementById("gz");
+      const sourceEl = document.getElementById("source");
+      const ts = document.getElementById("ts");
 
-      function showBasicInfo() {
-        setContext(
-          `Secure context: <strong>${
-            window.isSecureContext
-              ? '<span class="ok">yes</span>'
-              : '<span class="bad">no</span>'
-          }</strong>` +
-            ` — navigator.bluetooth: <strong>${
-              navigator.bluetooth
-                ? '<span class="ok">present</span>'
-                : '<span class="bad">missing</span>'
-            }</strong>` +
-            `<br>User agent: <code>${navigator.userAgent}</code>`
-        );
-      }
+      let accelSensor = null,
+        gyroSensor = null; // Generic Sensor API objects
+      let dmListener = null; // DeviceMotion fallback
+      let orientationListener = null;
+      let last = { ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0 };
 
-      // core check
-      checkBtn.addEventListener("click", () => {
-        showBasicInfo();
-        if (!navigator.bluetooth) {
-          log("navigator.bluetooth not available in this browser build.");
-          log(
-            "Tip: Opera mobile builds vary — try Chrome for Android for best Web Bluetooth compatibility."
-          );
-          return;
-        }
-        log(
-          "navigator.bluetooth present; secure context=" +
-            window.isSecureContext
-        );
-        // If not secure, immediately tell user
-        if (!window.isSecureContext) {
-          log(
-            "Page is not secure. Serve over HTTPS or use localhost for testing."
-          );
-        }
+      const simulateBtn = document.getElementById("simulate");
+      simulateBtn.addEventListener("click", () => {
+        // simple synthetic bump for debugging
+        const now = Date.now();
+        const axv = Math.sin(now / 200) * 1.5;
+        const ayv = Math.cos(now / 200) * 1.2;
+        const azv = 9.81;
+        ax.textContent = fmt(axv, 3);
+        ay.textContent = fmt(ayv, 3);
+        az.textContent = fmt(azv, 3);
+        const gxv = Math.sin(now / 120) * 25;
+        const gyv = Math.cos(now / 140) * 18;
+        const gzv = Math.sin(now / 90) * 12;
+        gx.textContent = fmt(gxv, 3);
+        gy.textContent = fmt(gyv, 3);
+        gz.textContent = fmt(gzv, 3);
+        moveDotFromAccel(axv, ayv);
       });
 
-      // attempt connect: NUS first, then acceptAllDevices fallback
-      let device = null,
-        server = null,
-        txChar = null;
-      const NUS = {
-        service: "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
-        tx: "6e400002-b5a3-f393-e0a9-e50e24dcca9e",
-      };
+      function setStatus(s) {
+        statusEl.textContent = s;
+      }
 
-      connectBtn.addEventListener("click", async () => {
-        log("User gesture: opening device chooser...");
-        if (!navigator.bluetooth) {
-          log("navigator.bluetooth missing — cannot proceed.");
+      async function requestIOSMotionPermissionIfNeeded() {
+        // iOS Safari (and WebViews) require explicit permission via this method
+        if (
+          typeof DeviceMotionEvent !== "undefined" &&
+          typeof DeviceMotionEvent.requestPermission === "function"
+        ) {
+          try {
+            const p = await DeviceMotionEvent.requestPermission();
+            return p === "granted";
+          } catch (e) {
+            console.warn("DeviceMotionEvent.requestPermission failed", e);
+            return false;
+          }
+        }
+        return true; // not required
+      }
+
+      async function checkPermissions() {
+        const permEl = document.getElementById("permStatus");
+        if (!navigator.permissions) {
+          permEl.textContent = "Perm: Permissions API not available";
           return;
         }
         try {
-          // Try filtered chooser
+          const accPerm = await navigator.permissions
+            .query({ name: "accelerometer" })
+            .catch(() => null);
+          const gyroPerm = await navigator.permissions
+            .query({ name: "gyroscope" })
+            .catch(() => null);
+          let s = "Perm:";
+          s += accPerm ? ` acc=${accPerm.state}` : " acc=?";
+          s += gyroPerm ? ` gyro=${gyroPerm.state}` : " gyro=?";
+          permEl.textContent = s;
+        } catch (e) {
+          permEl.textContent = "Perm: error";
+          console.warn("perm check failed", e);
+        }
+      }
+
+      function moveDotFromAccel(axv, ayv) {
+        // Map acceleration (m/s^2) to pixel translation with a clamp
+        const rect = stage.getBoundingClientRect();
+        const cx = rect.width / 2,
+          cy = rect.height / 2;
+        // simple scaling
+        const sx = Math.max(-1, Math.min(1, axv / 9.81));
+        const sy = Math.max(-1, Math.min(1, ayv / 9.81));
+        const px = cx + sx * (rect.width / 2 - 30);
+        const py = cy + sy * (rect.height / 2 - 30);
+        dot.style.left = px + "px";
+        dot.style.top = py + "px";
+      }
+
+      async function startSensors() {
+        setStatus("starting...");
+        document.getElementById("sensorLog").textContent = "Sensor: starting";
+        await checkPermissions();
+        if (!(await requestIOSMotionPermissionIfNeeded())) {
+          setStatus("permission denied");
+          document.getElementById("sensorLog").textContent =
+            "Sensor: iOS permission denied";
+          return;
+        }
+
+        // Prefer Generic Sensor API when available
+        if ("Gyroscope" in window && "Accelerometer" in window) {
           try {
-            device = await navigator.bluetooth.requestDevice({
-              filters: [{ services: [NUS.service] }],
-              optionalServices: [NUS.service],
+            sourceEl.textContent = "Generic Sensor API";
+            document.getElementById("sensorLog").textContent =
+              "Sensor: trying Generic Sensor API";
+            accelSensor = new Accelerometer({ frequency: 60 });
+            gyroSensor = new Gyroscope({ frequency: 60 });
+
+            accelSensor.addEventListener("reading", () => {
+              const axv = accelSensor.x;
+              const ayv = accelSensor.y;
+              const azv = accelSensor.z;
+              ax.textContent = fmt(axv, 3);
+              ay.textContent = fmt(ayv, 3);
+              az.textContent = fmt(azv, 3);
+              last.ax = axv;
+              last.ay = ayv;
+              last.az = azv;
+              moveDotFromAccel(axv, ayv);
+              ts.textContent = Date.now();
             });
-            log("Device selected (filtered):", device.name || device.id);
-          } catch (e) {
-            log("Filtered chooser fallback:", e && e.message ? e.message : e);
-            // fallback to acceptAllDevices so user sees chooser
-            device = await navigator.bluetooth.requestDevice({
-              acceptAllDevices: true,
-              optionalServices: [NUS.service],
+
+            gyroSensor.addEventListener("reading", () => {
+              // Generic Sensor API gyro values are in rad/s
+              const gxv = gyroSensor.x;
+              const gyv = gyroSensor.y;
+              const gzv = gyroSensor.z;
+              // convert to deg/s for easier reading
+              gx.textContent = fmt((gxv * 180) / Math.PI, 3);
+              gy.textContent = fmt((gyv * 180) / Math.PI, 3);
+              gz.textContent = fmt((gzv * 180) / Math.PI, 3);
+              last.gx = gxv;
+              last.gy = gyv;
+              last.gz = gzv;
+              ts.textContent = Date.now();
             });
-            log(
-              "Device selected (acceptAllDevices):",
-              device.name || device.id
+
+            accelSensor.addEventListener("error", (e) => {
+              console.warn("accel error", e);
+              document.getElementById("sensorLog").textContent =
+                "Sensor error: " + (e && e.message ? e.message : String(e));
+            });
+            gyroSensor.addEventListener("error", (e) => {
+              console.warn("gyro error", e);
+              document.getElementById("sensorLog").textContent =
+                "Sensor error: " + (e && e.message ? e.message : String(e));
+            });
+
+            await accelSensor.start();
+            await gyroSensor.start();
+
+            setStatus("running (Generic Sensor)");
+            document.getElementById("sensorLog").textContent =
+              "Sensor: running (Generic Sensor)";
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            return;
+          } catch (err) {
+            console.warn("Generic Sensor API failed or blocked:", err);
+            const emsg = err && err.message ? err.message : String(err);
+            document.getElementById("sensorLog").textContent =
+              "Generic Sensor API failed: " +
+              emsg +
+              " — ensure page uses HTTPS and site permissions.";
+            // fallthrough to DeviceMotion
+          }
+        }
+
+        // Fallback: DeviceMotionEvent (widely available on mobile)
+        if ("DeviceMotionEvent" in window) {
+          sourceEl.textContent = "DeviceMotionEvent (fallback)";
+          document.getElementById("sensorLog").textContent =
+            "Sensor: using DeviceMotionEvent fallback";
+          dmListener = function (e) {
+            const acc = e.acceleration ||
+              e.accelerationIncludingGravity || { x: 0, y: 0, z: 0 };
+            const rot = e.rotationRate || {
+              alpha: null,
+              beta: null,
+              gamma: null,
+            };
+            // DeviceMotionEvent.rotationRate values are in deg/s; if null, use deviceorientation fallback
+            ax.textContent = fmt(acc.x, 3);
+            ay.textContent = fmt(acc.y, 3);
+            az.textContent = fmt(acc.z, 3);
+            const ra =
+              rot.alpha !== null && rot.alpha !== undefined
+                ? rot.alpha
+                : lastOrientation.alpha || 0;
+            const rb =
+              rot.beta !== null && rot.beta !== undefined
+                ? rot.beta
+                : lastOrientation.beta || 0;
+            const rg =
+              rot.gamma !== null && rot.gamma !== undefined
+                ? rot.gamma
+                : lastOrientation.gamma || 0;
+            gx.textContent = fmt(ra, 3);
+            gy.textContent = fmt(rb, 3);
+            gz.textContent = fmt(rg, 3);
+            moveDotFromAccel(acc.x || 0, acc.y || 0);
+            ts.textContent = Date.now();
+          };
+          window.addEventListener("devicemotion", dmListener, true);
+          setStatus("running (DeviceMotion)");
+          document.getElementById("sensorLog").textContent =
+            "Sensor: devicemotion running";
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          return;
+        }
+
+        setStatus("no sensors available");
+        document.getElementById("sensorLog").textContent =
+          "Sensor: none available";
+      }
+
+      function stopSensors() {
+        try {
+          if (accelSensor && accelSensor.stop) accelSensor.stop();
+          if (gyroSensor && gyroSensor.stop) gyroSensor.stop();
+          if (dmListener)
+            window.removeEventListener("devicemotion", dmListener, true);
+        } catch (e) {
+          console.warn("stop error", e);
+        }
+        accelSensor = null;
+        gyroSensor = null;
+        dmListener = null;
+        setStatus("stopped");
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        sourceEl.textContent = "—";
+      }
+
+      startBtn.addEventListener("click", () => {
+        startSensors();
+      });
+      stopBtn.addEventListener("click", () => {
+        stopSensors();
+      });
+
+      // keep dot centered initially
+      window.addEventListener("load", () => {
+        moveDotFromAccel(0, 0);
+      });
+
+      // -------------------- Web Bluetooth section --------------------
+      // Uses Nordic UART Service (NUS) UUIDs by default for BLE UART-like behavior.
+      const NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+      const NUS_TX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // write
+
+      let bleDevice = null;
+      let bleServer = null;
+      let txChar = null;
+      let sendIntervalId = null;
+
+      const btConnectBtn = document.getElementById("btConnect");
+      const btDisconnectBtn = document.getElementById("btDisconnect");
+      const btStatus = document.getElementById("btStatus");
+      const btLogEl = document.getElementById("btLog");
+
+      function logBT(...args) {
+        const s = args
+          .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+          .join(" ");
+        console.warn("BT:", s);
+        if (btLogEl) {
+          btLogEl.textContent = s;
+        }
+      }
+
+      function updateBTStatus(s) {
+        btStatus.textContent = "BT: " + s;
+      }
+
+      async function connectBluetooth() {
+        if (!navigator.bluetooth) {
+          updateBTStatus("unsupported");
+          logBT("navigator.bluetooth missing");
+          return;
+        }
+        updateBTStatus("requesting...");
+        logBT("Starting Bluetooth device chooser");
+
+        // Opera Mobile check (may not support Web Bluetooth)
+        const ua = navigator.userAgent || "";
+        if (/opera|opr/i.test(ua)) {
+          logBT(
+            "Notice: Opera may not support Web Bluetooth on all platforms. If chooser does not show, try Chrome on Android. UserAgent: " +
+              ua
+          );
+        }
+
+        try {
+          try {
+            bleDevice = await navigator.bluetooth.requestDevice({
+              filters: [{ services: [NUS_SERVICE_UUID] }],
+              optionalServices: [NUS_SERVICE_UUID],
+            });
+          } catch (filteredErr) {
+            logBT(
+              "Filtered chooser failed:",
+              filteredErr,
+              "Falling back to acceptAllDevices"
             );
+            bleDevice = await navigator.bluetooth.requestDevice({
+              acceptAllDevices: true,
+              optionalServices: [NUS_SERVICE_UUID],
+            });
           }
 
-          device.addEventListener("gattserverdisconnected", () => {
-            log("Device disconnected");
-            disconnectBtn.disabled = false;
-            connectBtn.disabled = false;
-          });
-          log("Connecting to GATT...");
-          server = await device.gatt.connect();
-          log("Connected. Discovering services...");
+          if (!bleDevice) {
+            updateBTStatus("no-device");
+            logBT("No device selected");
+            return;
+          }
 
-          // Prefer NUS service, else scan for any writable characteristic
+          bleDevice.addEventListener("gattserverdisconnected", onDisconnected);
+          updateBTStatus("connecting GATT...");
+          logBT("Connecting to GATT server...");
+          bleServer = await bleDevice.gatt.connect();
+
+          // Try NUS service first, then fall back to scanning services and characteristics
           try {
-            const svc = await server.getPrimaryService(NUS.service);
-            txChar = await svc.getCharacteristic(NUS.tx);
-            log("Found NUS TX characteristic", txChar.uuid);
+            const service = await bleServer.getPrimaryService(NUS_SERVICE_UUID);
+            txChar = await service.getCharacteristic(NUS_TX_CHAR_UUID);
+            logBT("Found NUS TX characteristic");
           } catch (nusErr) {
-            log(
-              "NUS not found; scanning all services for writable characteristics..."
+            logBT(
+              "NUS not found, scanning for any writable characteristic",
+              nusErr
             );
-            const services = await server.getPrimaryServices();
+            // enumerate services
+            const services = await bleServer.getPrimaryServices();
             for (const svc of services) {
               try {
                 const chars = await svc.getCharacteristics();
                 for (const c of chars) {
-                  const p = c.properties || {};
-                  if (p.write || p.writeWithoutResponse) {
+                  const props = c.properties || {};
+                  if (props.write || props.writeWithoutResponse) {
                     txChar = c;
-                    log("Selected writable char", {
+                    logBT("Selected writable characteristic", {
                       service: svc.uuid,
                       char: c.uuid,
-                      props: p,
+                      props,
                     });
                     break;
                   }
                 }
                 if (txChar) break;
-              } catch (scanErr) {
-                log("Error scanning service", svc.uuid, scanErr);
+              } catch (e) {
+                logBT("Error scanning service", svc.uuid, e);
               }
             }
           }
 
           if (!txChar) {
-            log(
-              "No writable characteristic found. The peripheral might not expose a UART-like service. Try HM-10 or a BLE UART module."
-            );
+            updateBTStatus("no-writable-char");
+            logBT("No writable characteristic found on device");
             return;
           }
 
-          log("Ready to write; sending a test packet...");
-          const sample = "TEST\n";
-          await txChar.writeValue(new TextEncoder().encode(sample));
-          log(
-            "Write OK (test packet sent). Now the page will be able to write strings to the device using this characteristic."
-          );
-
-          connectBtn.disabled = true;
-          disconnectBtn.disabled = false;
+          updateBTStatus("connected");
+          btConnectBtn.disabled = true;
+          btDisconnectBtn.disabled = false;
+          if (sendIntervalId) clearInterval(sendIntervalId);
+          sendIntervalId = setInterval(sendIMUOverBT, 10);
+          logBT("Send loop started");
         } catch (err) {
-          log(
-            "Connection flow failed:",
-            err && err.message ? err.message : err
-          );
-          if (err && err.name === "NotFoundError") {
-            log("User cancelled the chooser or no device matched the filter.");
-          } else if (err && err.name === "SecurityError") {
-            log(
-              "SecurityError: likely insecure origin (not HTTPS) or blocked by site settings."
-            );
-          } else if (err && err.name === "NotSupportedError") {
-            log(
-              "NotSupportedError: the characteristic method required is not supported on this UA/build."
-            );
-          }
+          logBT("BT connect error", err);
+          updateBTStatus("error");
         }
-      });
+      }
 
-      disconnectBtn.addEventListener("click", async () => {
+      async function disconnectBluetooth() {
+        if (sendIntervalId) {
+          clearInterval(sendIntervalId);
+          sendIntervalId = null;
+        }
+        if (!bleDevice) return;
         try {
-          if (device && device.gatt && device.gatt.connected) {
-            device.gatt.disconnect();
-            log("Disconnected from device.");
-          }
-        } catch (e) {
-          log("Disconnect error", e);
-        }
-        disconnectBtn.disabled = true;
-        connectBtn.disabled = false;
-      });
+          if (bleDevice.gatt.connected) await bleDevice.gatt.disconnect();
+        } catch (e) {}
+        bleDevice = null;
+        bleServer = null;
+        txChar = null;
+        btConnectBtn.disabled = false;
+        btDisconnectBtn.disabled = true;
+        updateBTStatus("disconnected");
+      }
 
-      showBasicInfo();
+      function onDisconnected() {
+        updateBTStatus("disconnected (auto)");
+        btConnectBtn.disabled = false;
+        btDisconnectBtn.disabled = true;
+        if (sendIntervalId) {
+          clearInterval(sendIntervalId);
+          sendIntervalId = null;
+        }
+      }
+
+      async function sendIMUOverBT() {
+        if (!txChar) return;
+        const sample = {
+          gx: typeof last.gx === "number" ? (last.gx * 180) / Math.PI : 0,
+          gy: typeof last.gy === "number" ? (last.gy * 180) / Math.PI : 0,
+          gz: typeof last.gz === "number" ? (last.gz * 180) / Math.PI : 0,
+          ax: typeof last.ax === "number" ? last.ax : 0,
+          ay: typeof last.ay === "number" ? last.ay : 0,
+          az: typeof last.az === "number" ? last.az : 0,
+        };
+        const out = `Gx:${sample.gx.toFixed(3)} Gy:${sample.gy.toFixed(
+          3
+        )} Gz:${sample.gz.toFixed(3)} Ax:${sample.ax.toFixed(
+          3
+        )} Ay:${sample.ay.toFixed(3)} Az:${sample.az.toFixed(3)}\n`;
+        try {
+          const data = new TextEncoder().encode(out);
+          // Some characteristics may prefer writeWithoutResponse; writeValue will still work in many browsers.
+          await txChar.writeValue(data);
+        } catch (err) {
+          logBT("BT write failed", err);
+          try {
+            if (bleDevice && bleDevice.gatt.connected)
+              bleDevice.gatt.disconnect();
+          } catch (e) {}
+          onDisconnected();
+        }
+      }
+
+      btConnectBtn.addEventListener("click", () => connectBluetooth());
+      btDisconnectBtn.addEventListener("click", () => disconnectBluetooth());
+
+      // If user starts sensors while BT connected, keep sending
+      startBtn.addEventListener("click", () => {
+        if (
+          bleDevice &&
+          bleDevice.gatt &&
+          bleDevice.gatt.connected &&
+          !sendIntervalId
+        ) {
+          sendIntervalId = setInterval(sendIMUOverBT, 10);
+        }
+      });
     </script>
   </body>
 </html>
