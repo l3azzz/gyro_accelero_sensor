@@ -28,7 +28,6 @@
         background: linear-gradient(180deg, var(--bg) 0%, #021420 100%);
       }
 
-      /* layout */
       .wrap {
         max-width: 980px;
         margin: 18px auto;
@@ -46,7 +45,6 @@
         border: 1px solid rgba(255, 255, 255, 0.03);
       }
 
-      /* left column */
       .left {
         display: flex;
         flex-direction: column;
@@ -69,9 +67,15 @@
         padding: 10px 14px;
         border-radius: 10px;
         font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.3s, color 0.3s;
       }
       button:active {
         transform: translateY(1px);
+      }
+      button.active {
+        background-color: var(--accent1);
+        color: #000;
       }
       .small {
         font-size: 13px;
@@ -106,7 +110,6 @@
         transition: transform 0.08s linear, left 0.08s linear, top 0.08s linear;
       }
 
-      /* right column */
       .readouts {
         display: flex;
         flex-direction: column;
@@ -130,7 +133,7 @@
         color: #e6eef6;
       }
       h3 {
-        margin: 0 0 8px 0;
+        margin: 0 0 10px 0;
       }
       .notes {
         font-size: 13px;
@@ -138,7 +141,6 @@
         line-height: 1.4;
       }
 
-      /* responsive adjustments (mobile-first) */
       @media (max-width: 820px) {
         .wrap {
           grid-template-columns: 1fr;
@@ -173,15 +175,6 @@
           font-size: 14px;
         }
       }
-      /* subtle glass header inside left panel */
-      .status-pill {
-        background: var(--glass);
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 13px;
-        color: var(--muted);
-        display: inline-block;
-      }
     </style>
   </head>
   <body>
@@ -189,37 +182,11 @@
       <div class="wrap">
         <div class="panel left">
           <div class="controls">
-            <button id="start">Start Sensors</button>
-            <!-- Start button acts as toggle: text will flip to Stop Sensors when running -->
-            <button id="btConnect">Connect Bluetooth</button>
-            <button id="btDisconnect" disabled>Disconnect BT</button>
-            <button id="simulate">Simulate Motion</button>
-            <button id="ctrlMode">CTRL MODE</button>
+            <button id="btToggle">Bluetooth: OFF</button>
             <button id="gyroToggle" aria-pressed="true">Gyro: ON</button>
             <button id="accelToggle" aria-pressed="true">Accel: ON</button>
+            <button id="ctrlMode">CTRL MODE</button>
             <div class="small" id="status">idle</div>
-            <div class="small" id="btStatus" style="margin-left: 8px">
-              BT: disconnected
-            </div>
-            <div
-              id="btLog"
-              class="small"
-              style="margin-left: 8px; max-width: 260px; word-break: break-word"
-            ></div>
-            <div
-              id="permStatus"
-              class="small"
-              style="margin-left: 8px; max-width: 260px; word-break: break-word"
-            >
-              Perm: unknown
-            </div>
-            <div
-              id="sensorLog"
-              class="small"
-              style="margin-left: 8px; max-width: 260px; word-break: break-word"
-            >
-              Sensor: idle
-            </div>
           </div>
 
           <div class="dot-area" id="stage">
@@ -227,14 +194,13 @@
           </div>
 
           <div class="notes small">
-            Tip: open this page in Chrome on your Android phone over HTTPS. If
-            sensors are blocked, serve the page via HTTPS and check site
-            permissions.
+            Tip: Open on an Android device with Chrome over HTTPS for full
+            sensor and Bluetooth functionality.
           </div>
         </div>
 
         <div class="panel right">
-          <h3 style="margin: 0 0 10px 0">Live sensor readout</h3>
+          <h3>Live Sensor Readout</h3>
           <div class="readouts">
             <div class="row">
               <div>Accel X</div>
@@ -275,830 +241,222 @@
       </div>
     </div>
 
-    <!-- CTRL MODE panel (hidden by default) -->
     <div
       id="ctrlPanel"
       class="panel"
       style="display: none; margin: 18px auto; max-width: 760px"
     >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-        "
-      >
-        <h3 style="margin: 0">Control Mode</h3>
-        <div>
-          <button id="backHome">Home</button>
-        </div>
-      </div>
-
-      <div
-        style="
-          margin-top: 12px;
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-          align-items: flex-start;
-        "
-      >
-        <!-- Bluetooth info inside control panel only -->
-        <div style="flex: 1 1 220px; min-width: 200px">
-          <h4>Bluetooth</h4>
-          <div class="small">Device: <span id="ctrlBtName">—</span></div>
-          <div class="small">
-            Status: <span id="ctrlBtStatus">disconnected</span>
-          </div>
-        </div>
-
-        <!-- Modes area: Sleep (0), RC (1), Obstacle (2), Line Follow (3) -->
-        <div style="flex: 1 1 260px; min-width: 220px">
-          <h4>Modes</h4>
-          <div
-            id="modesWrap"
-            style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px"
-          >
-            <button
-              data-mode="0"
-              class="modeBtn mode-sleep"
-              style="padding: 14px 18px; font-weight: 700; font-size: 16px"
-            >
-              Sleep
-            </button>
-            <button data-mode="1" class="modeBtn">RC Mode</button>
-            <button data-mode="2" class="modeBtn">Obstacle</button>
-            <button data-mode="3" class="modeBtn">Line Follow</button>
-            <button
-              id="noModeBtn"
-              title="No mode"
-              class="modeBtn"
-              style="width: 44px"
-            >
-              .
-            </button>
-          </div>
-        </div>
-
-        <!-- RC Controls: visible only when RC Mode active -->
-        <div
-          id="rcControls"
-          style="flex: 1 1 240px; min-width: 200px; display: none"
-        >
-          <h4>RC Controls</h4>
-          <div
-            style="
-              display: grid;
-              grid-template-columns: 64px 64px 64px;
-              gap: 10px;
-              justify-items: center;
-              align-items: center;
-              margin-top: 8px;
-            "
-          >
-            <div></div>
-            <button data-cmd="F" class="rcBtn svgBtn" title="Forward">
-              <!-- up arrow -->
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="7 14 12 9 17 14"></polyline>
-              </svg>
-            </button>
-            <div></div>
-
-            <button data-cmd="L" class="rcBtn svgBtn" title="Left">
-              <!-- left arrow -->
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="14 7 9 12 14 17"></polyline>
-              </svg>
-            </button>
-            <button
-              data-cmd="S"
-              class="rcBtn svgBtn"
-              title="Stop"
-              style="
-                border-radius: 6px;
-                background: rgba(255, 255, 255, 0.03);
-                width: 64px;
-                height: 64px;
-              "
-            >
-              <!-- square stop -->
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <rect x="6" y="6" width="12" height="12"></rect>
-              </svg>
-            </button>
-            <button data-cmd="R" class="rcBtn svgBtn" title="Right">
-              <!-- right arrow -->
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="10 7 15 12 10 17"></polyline>
-              </svg>
-            </button>
-
-            <div></div>
-            <button data-cmd="B" class="rcBtn svgBtn" title="Backward">
-              <!-- down arrow -->
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="7 10 12 15 17 10"></polyline>
-              </svg>
-            </button>
-            <div></div>
-          </div>
-        </div>
-      </div>
+      <!-- Content for CTRL MODE -->
     </div>
 
     <script>
-      // Small helper: format numbers
-      const fmt = (v, n = 2) => (typeof v === "number" ? v.toFixed(n) : "—");
-      // --- Control panel / RC commands / Start toggle helpers ---
-      const ctrlPanel = document.getElementById("ctrlPanel");
-      const backHome = document.getElementById("backHome");
-      // button in markup is 'ctrlMode'
-      const btnShowCtrl = document.getElementById("ctrlMode");
-      const gyroToggle = document.getElementById("gyroToggle");
-      const accelToggle = document.getElementById("accelToggle");
+      (() => {
+        const btToggleBtn = document.getElementById("btToggle");
+        const gyroToggle = document.getElementById("gyroToggle");
+        const accelToggle = document.getElementById("accelToggle");
+        const dot = document.getElementById("dot");
+        const stage = document.getElementById("stage");
 
-      // toggle state flags
-      let showGyro = true;
-      let showAccel = true;
+        const axEl = document.getElementById("ax");
+        const ayEl = document.getElementById("ay");
+        const azEl = document.getElementById("az");
+        const gxEl = document.getElementById("gx");
+        const gyEl = document.getElementById("gy");
+        const gzEl = document.getElementById("gz");
+        const tsEl = document.getElementById("ts");
+        const sourceEl = document.getElementById("source");
 
-      // Ensure toggles exist (older versions of the page may not have them)
-      if (!gyroToggle) {
-        console.warn("gyroToggle not found in DOM");
-      }
+        let bleDevice = null;
+        let txChar = null;
 
-      function sendBTCommand(cmd) {
-        const out = String(cmd);
-        const connected =
-          bleDevice && bleDevice.gatt && bleDevice.gatt.connected;
-        if (txChar && connected) {
-          try {
-            txChar.writeValue(new TextEncoder().encode(out));
-            logBT("TX: " + out);
-          } catch (e) {
-            logBT("BT write error: " + e.message);
-          }
-        } else {
-          logBT("BT not connected; would send: " + out);
-        }
-      }
+        let sensors = { gyro: null, accel: null };
+        let lastReading = { ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0 };
+        let uiState = { gyroOn: true, accelOn: true, sensorsRunning: false };
+        let dmListener = null;
 
-      // show / hide ctrl panel
-      if (btnShowCtrl)
-        btnShowCtrl.addEventListener("click", () => {
-          // hide main panels and show ctrl panel
-          document.getElementById("mainContainer").style.display = "none";
-          ctrlPanel.style.display = "block";
-        });
-      backHome.addEventListener("click", () => {
-        ctrlPanel.style.display = "none";
-        document.getElementById("mainContainer").style.display = "block";
-      });
+        const fmt = (v, n = 2) => (typeof v === "number" ? v.toFixed(n) : "—");
 
-      // wire mode buttons
-      document.querySelectorAll(".modeBtn").forEach((b) => {
-        b.addEventListener("click", (ev) => {
-          const cmd = ev.currentTarget.dataset.cmd || "M";
-          sendBTCommand(cmd);
-          // briefly flash button
-          ev.currentTarget.classList.add("active");
-          setTimeout(() => ev.currentTarget.classList.remove("active"), 200);
-        });
-      });
-
-      // wire RC buttons
-      document.querySelectorAll(".rcBtn").forEach((b) => {
-        b.addEventListener(
-          "touchstart",
-          (ev) => {
-            ev.preventDefault();
-            sendBTCommand(ev.currentTarget.dataset.cmd);
-          },
-          { passive: false }
-        );
-        b.addEventListener("mousedown", (ev) => {
-          ev.preventDefault();
-          sendBTCommand(ev.currentTarget.dataset.cmd);
-        });
-      });
-
-      // Start button toggle: start/stop sensors
-      // we wire the start button later in the file (startBtn is declared below), so no redeclaration here
-
-      // gyro/accel UI toggles: control whether we reflect those readings in the dot and readouts
-      if (gyroToggle) {
-        gyroToggle.addEventListener("click", (e) => {
-          showGyro = !showGyro;
-          gyroToggle.setAttribute("aria-pressed", showGyro ? "true" : "false");
-          gyroToggle.textContent = "Gyro: " + (showGyro ? "ON" : "OFF");
-        });
-      }
-      if (accelToggle) {
-        accelToggle.addEventListener("click", (e) => {
-          showAccel = !showAccel;
-          accelToggle.setAttribute(
-            "aria-pressed",
-            showAccel ? "true" : "false"
-          );
-          accelToggle.textContent = "Accel: " + (showAccel ? "ON" : "OFF");
-        });
-      }
-
-      // Keep gyro sensor running in background for data acquisition even if UI reflection is disabled
-      // The UI handlers check showGyro/showAccel before updating visuals.
-
-      const startBtn = document.getElementById("start");
-      const stopBtn = document.getElementById("stop");
-      const statusEl = document.getElementById("status");
-      const dot = document.getElementById("dot");
-      const stage = document.getElementById("stage");
-
-      const ax = document.getElementById("ax");
-      const ay = document.getElementById("ay");
-      const az = document.getElementById("az");
-      const gx = document.getElementById("gx");
-      const gy = document.getElementById("gy");
-      const gz = document.getElementById("gz");
-      const sourceEl = document.getElementById("source");
-      const ts = document.getElementById("ts");
-
-      let accelSensor = null,
-        gyroSensor = null; // Generic Sensor API objects
-      let dmListener = null; // DeviceMotion fallback
-      let orientationListener = null;
-      let last = { ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0 };
-
-      const simulateBtn = document.getElementById("simulate");
-      simulateBtn.addEventListener("click", () => {
-        // simple synthetic bump for debugging
-        const now = Date.now();
-        const axv = Math.sin(now / 200) * 1.5;
-        const ayv = Math.cos(now / 200) * 1.2;
-        const azv = 9.81;
-        ax.textContent = fmt(axv, 3);
-        ay.textContent = fmt(ayv, 3);
-        az.textContent = fmt(azv, 3);
-        const gxv = Math.sin(now / 120) * 25;
-        const gyv = Math.cos(now / 140) * 18;
-        const gzv = Math.sin(now / 90) * 12;
-        gx.textContent = fmt(gxv, 3);
-        gy.textContent = fmt(gyv, 3);
-        gz.textContent = fmt(gzv, 3);
-        moveDotFromAccel(axv, ayv);
-      });
-
-      function setStatus(s) {
-        statusEl.textContent = s;
-      }
-
-      async function requestIOSMotionPermissionIfNeeded() {
-        // iOS Safari (and WebViews) require explicit permission via this method
-        if (
-          typeof DeviceMotionEvent !== "undefined" &&
-          typeof DeviceMotionEvent.requestPermission === "function"
-        ) {
-          try {
-            const p = await DeviceMotionEvent.requestPermission();
-            return p === "granted";
-          } catch (e) {
-            console.warn("DeviceMotionEvent.requestPermission failed", e);
-            return false;
-          }
-        }
-        return true; // not required
-      }
-
-      async function checkPermissions() {
-        const permEl = document.getElementById("permStatus");
-        if (!navigator.permissions) {
-          permEl.textContent = "Perm: Permissions API not available";
-          return;
-        }
-        try {
-          const accPerm = await navigator.permissions
-            .query({ name: "accelerometer" })
-            .catch(() => null);
-          const gyroPerm = await navigator.permissions
-            .query({ name: "gyroscope" })
-            .catch(() => null);
-          let s = "Perm:";
-          s += accPerm ? ` acc=${accPerm.state}` : " acc=?";
-          s += gyroPerm ? ` gyro=${gyroPerm.state}` : " gyro=?";
-          permEl.textContent = s;
-        } catch (e) {
-          permEl.textContent = "Perm: error";
-          console.warn("perm check failed", e);
-        }
-      }
-
-      function moveDotFromAccel(axv, ayv) {
-        // Map acceleration (m/s^2) to pixel translation with a clamp
-        const rect = stage.getBoundingClientRect();
-        const cx = rect.width / 2,
-          cy = rect.height / 2;
-        // simple scaling
-        const sx = Math.max(-1, Math.min(1, axv / 9.81));
-        const sy = Math.max(-1, Math.min(1, ayv / 9.81));
-        const px = cx + sx * (rect.width / 2 - 30);
-        const py = cy + sy * (rect.height / 2 - 30);
-        dot.style.left = px + "px";
-        dot.style.top = py + "px";
-      }
-
-      async function startSensors() {
-        setStatus("starting...");
-        document.getElementById("sensorLog").textContent = "Sensor: starting";
-        await checkPermissions();
-        if (!(await requestIOSMotionPermissionIfNeeded())) {
-          setStatus("permission denied");
-          document.getElementById("sensorLog").textContent =
-            "Sensor: iOS permission denied";
-          return;
-        }
-
-        // Prefer Generic Sensor API when available
-        if ("Gyroscope" in window && "Accelerometer" in window) {
-          try {
-            sourceEl.textContent = "Generic Sensor API";
-            document.getElementById("sensorLog").textContent =
-              "Sensor: trying Generic Sensor API";
-            accelSensor = new Accelerometer({ frequency: 60 });
-            gyroSensor = new Gyroscope({ frequency: 60 });
-
-            accelSensor.addEventListener("reading", () => {
-              const axv = accelSensor.x;
-              const ayv = accelSensor.y;
-              const azv = accelSensor.z;
-              ax.textContent = fmt(axv, 3);
-              ay.textContent = fmt(ayv, 3);
-              az.textContent = fmt(azv, 3);
-              last.ax = axv;
-              last.ay = ayv;
-              last.az = azv;
-              moveDotFromAccel(axv, ayv);
-              ts.textContent = Date.now();
-            });
-
-            gyroSensor.addEventListener("reading", () => {
-              // Generic Sensor API gyro values are in rad/s
-              const gxv = gyroSensor.x;
-              const gyv = gyroSensor.y;
-              const gzv = gyroSensor.z;
-              // convert to deg/s for easier reading
-              gx.textContent = fmt((gxv * 180) / Math.PI, 3);
-              gy.textContent = fmt((gyv * 180) / Math.PI, 3);
-              gz.textContent = fmt((gzv * 180) / Math.PI, 3);
-              last.gx = gxv;
-              last.gy = gyv;
-              last.gz = gzv;
-              ts.textContent = Date.now();
-            });
-
-            accelSensor.addEventListener("error", (e) => {
-              console.warn("accel error", e);
-              document.getElementById("sensorLog").textContent =
-                "Sensor error: " + (e && e.message ? e.message : String(e));
-            });
-            gyroSensor.addEventListener("error", (e) => {
-              console.warn("gyro error", e);
-              document.getElementById("sensorLog").textContent =
-                "Sensor error: " + (e && e.message ? e.message : String(e));
-            });
-
-            await accelSensor.start();
-            await gyroSensor.start();
-
-            setStatus("running (Generic Sensor)");
-            document.getElementById("sensorLog").textContent =
-              "Sensor: running (Generic Sensor)";
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            return;
-          } catch (err) {
-            console.warn("Generic Sensor API failed or blocked:", err);
-            const emsg = err && err.message ? err.message : String(err);
-            document.getElementById("sensorLog").textContent =
-              "Generic Sensor API failed: " +
-              emsg +
-              " — ensure page uses HTTPS and site permissions.";
-            // fallthrough to DeviceMotion
-          }
-        }
-
-        // Fallback: DeviceMotionEvent (widely available on mobile)
-        if ("DeviceMotionEvent" in window) {
-          sourceEl.textContent = "DeviceMotionEvent (fallback)";
-          document.getElementById("sensorLog").textContent =
-            "Sensor: using DeviceMotionEvent fallback";
-          dmListener = function (e) {
-            const acc = e.acceleration ||
-              e.accelerationIncludingGravity || { x: 0, y: 0, z: 0 };
-            const rot = e.rotationRate || {
-              alpha: null,
-              beta: null,
-              gamma: null,
-            };
-            // DeviceMotionEvent.rotationRate values are in deg/s; if null, use deviceorientation fallback
-            ax.textContent = fmt(acc.x, 3);
-            ay.textContent = fmt(acc.y, 3);
-            az.textContent = fmt(acc.z, 3);
-            const ra =
-              rot.alpha !== null && rot.alpha !== undefined
-                ? rot.alpha
-                : lastOrientation.alpha || 0;
-            const rb =
-              rot.beta !== null && rot.beta !== undefined
-                ? rot.beta
-                : lastOrientation.beta || 0;
-            const rg =
-              rot.gamma !== null && rot.gamma !== undefined
-                ? rot.gamma
-                : lastOrientation.gamma || 0;
-            gx.textContent = fmt(ra, 3);
-            gy.textContent = fmt(rb, 3);
-            gz.textContent = fmt(rg, 3);
-            moveDotFromAccel(acc.x || 0, acc.y || 0);
-            ts.textContent = Date.now();
-          };
-          window.addEventListener("devicemotion", dmListener, true);
-          setStatus("running (DeviceMotion)");
-          document.getElementById("sensorLog").textContent =
-            "Sensor: devicemotion running";
-          startBtn.disabled = true;
-          stopBtn.disabled = false;
-          return;
-        }
-
-        setStatus("no sensors available");
-        document.getElementById("sensorLog").textContent =
-          "Sensor: none available";
-      }
-
-      // wire start button toggle here (only once)
-      startBtn.addEventListener("click", () => {
-        if (startBtn.dataset.running === "1") {
-          stopSensors();
-          startBtn.textContent = "Start Sensors";
-          startBtn.dataset.running = "0";
-        } else {
-          startSensors();
-          startBtn.textContent = "Stop Sensors";
-          startBtn.dataset.running = "1";
-        }
-      });
-
-      function stopSensors() {
-        try {
-          if (accelSensor && accelSensor.stop) accelSensor.stop();
-          if (gyroSensor && gyroSensor.stop) gyroSensor.stop();
-          if (dmListener)
-            window.removeEventListener("devicemotion", dmListener, true);
-        } catch (e) {
-          console.warn("stop error", e);
-        }
-        accelSensor = null;
-        gyroSensor = null;
-        dmListener = null;
-        setStatus("stopped");
-        startBtn.disabled = false;
-        if (stopBtn) stopBtn.disabled = true;
-        sourceEl.textContent = "—";
-      }
-
-      // keep dot centered initially
-      window.addEventListener("load", () => {
-        moveDotFromAccel(0, 0);
-      });
-
-      // -------------------- Web Bluetooth section --------------------
-      // Uses Nordic UART Service (NUS) UUIDs by default for BLE UART-like behavior.
-      const NUS_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-      const NUS_TX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // write
-
-      let bleDevice = null;
-      let bleServer = null;
-      let txChar = null;
-      let sendIntervalId = null;
-
-      const btConnectBtn = document.getElementById("btConnect");
-      const btDisconnectBtn = document.getElementById("btDisconnect");
-      const btStatus = document.getElementById("btStatus");
-      const btLogEl = document.getElementById("btLog");
-
-      function logBT(...args) {
-        const s = args
-          .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
-          .join(" ");
-        console.warn("BT:", s);
-        if (btLogEl) {
-          btLogEl.textContent = s;
-        }
-      }
-
-      function updateBTStatus(s) {
-        btStatus.textContent = "BT: " + s;
-      }
-
-      async function connectBluetooth() {
-        if (!navigator.bluetooth) {
-          updateBTStatus("unsupported");
-          logBT("navigator.bluetooth missing");
-          return;
-        }
-        updateBTStatus("requesting...");
-        logBT("Starting Bluetooth device chooser");
-
-        // Opera Mobile check (may not support Web Bluetooth)
-        const ua = navigator.userAgent || "";
-        if (/opera|opr/i.test(ua)) {
-          logBT(
-            "Notice: Opera may not support Web Bluetooth on all platforms. If chooser does not show, try Chrome on Android. UserAgent: " +
-              ua
-          );
-        }
-
-        try {
-          // Open a broad device chooser so the user sees all nearby BLE devices immediately.
-          // Using acceptAllDevices avoids showing an empty filtered picker on some devices/browsers.
-          bleDevice = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-          });
-
-          if (!bleDevice) {
-            updateBTStatus("no-device");
-            logBT("No device selected");
-            return;
-          }
-
-          bleDevice.addEventListener("gattserverdisconnected", onDisconnected);
-          updateBTStatus("connecting GATT...");
-          logBT("Connecting to GATT server...");
-          bleServer = await bleDevice.gatt.connect();
-
-          // Try NUS service first, then fall back to scanning services and characteristics
-          try {
-            const service = await bleServer.getPrimaryService(NUS_SERVICE_UUID);
-            txChar = await service.getCharacteristic(NUS_TX_CHAR_UUID);
-            logBT("Found NUS TX characteristic");
-          } catch (nusErr) {
-            logBT(
-              "NUS not found, scanning for any writable characteristic",
-              nusErr
-            );
-            // enumerate services
-            const services = await bleServer.getPrimaryServices();
-            for (const svc of services) {
-              try {
-                const chars = await svc.getCharacteristics();
-                for (const c of chars) {
-                  const props = c.properties || {};
-                  if (props.write || props.writeWithoutResponse) {
-                    txChar = c;
-                    logBT("Selected writable characteristic", {
-                      service: svc.uuid,
-                      char: c.uuid,
-                      props,
-                    });
+        async function toggleBluetooth() {
+          if (bleDevice && bleDevice.gatt.connected) {
+            await bleDevice.gatt.disconnect();
+            btToggleBtn.textContent = "Bluetooth: OFF";
+            btToggleBtn.classList.remove("active");
+            bleDevice = null;
+            txChar = null;
+          } else {
+            try {
+              btToggleBtn.textContent = "Connecting...";
+              const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+              });
+              device.addEventListener("gattserverdisconnected", () => {
+                btToggleBtn.textContent = "Bluetooth: OFF";
+                btToggleBtn.classList.remove("active");
+                bleDevice = null;
+                txChar = null;
+              });
+              const server = await device.gatt.connect();
+              const services = await server.getPrimaryServices();
+              for (const service of services) {
+                const characteristics = await service.getCharacteristics();
+                for (const char of characteristics) {
+                  if (
+                    char.properties.write ||
+                    char.properties.writeWithoutResponse
+                  ) {
+                    txChar = char;
                     break;
                   }
                 }
                 if (txChar) break;
-              } catch (e) {
-                logBT("Error scanning service", svc.uuid, e);
               }
+              if (!txChar) throw new Error("No writable characteristic found.");
+
+              bleDevice = device;
+              btToggleBtn.textContent = "Bluetooth: ON";
+              btToggleBtn.classList.add("active");
+            } catch (error) {
+              alert("Bluetooth connection failed: " + error.message);
+              btToggleBtn.textContent = "Bluetooth: OFF";
             }
           }
+        }
 
-          if (!txChar) {
-            updateBTStatus("no-writable-char");
-            logBT("No writable characteristic found on device");
-            return;
+        function updateUIToggles() {
+          gyroToggle.textContent = `Gyro: ${uiState.gyroOn ? "ON" : "OFF"}`;
+          accelToggle.textContent = `Accel: ${uiState.accelOn ? "ON" : "OFF"}`;
+          gyroToggle.classList.toggle("active", uiState.gyroOn);
+          accelToggle.classList.toggle("active", uiState.accelOn);
+
+          if (uiState.gyroOn || uiState.accelOn) {
+            if (!uiState.sensorsRunning) startSensors();
+          } else {
+            if (uiState.sensorsRunning) stopSensors();
+          }
+        }
+
+        function moveDot() {
+          const rect = stage.getBoundingClientRect();
+          const cx = rect.width / 2;
+          const cy = rect.height / 2;
+
+          let moveX = 0,
+            moveY = 0;
+
+          if (uiState.accelOn) {
+            moveX += lastReading.ax;
+            moveY += lastReading.ay;
+          }
+          if (uiState.gyroOn) {
+            moveX += lastReading.gx * 5; // Gyro values need scaling
+            moveY += lastReading.gy * 5;
           }
 
-          updateBTStatus("connected");
-          btConnectBtn.disabled = true;
-          btDisconnectBtn.disabled = false;
-          if (sendIntervalId) clearInterval(sendIntervalId);
-          sendIntervalId = setInterval(sendIMUOverBT, 10);
-          logBT("Send loop started");
-          // update ctrl panel BT info
-          const ctrlNameEl = document.getElementById("ctrlBtName");
-          const ctrlStatusEl = document.getElementById("ctrlBtStatus");
-          if (ctrlNameEl)
-            ctrlNameEl.textContent = bleDevice.name || bleDevice.id || "—";
-          if (ctrlStatusEl) ctrlStatusEl.textContent = "connected";
-        } catch (err) {
-          logBT("BT connect error", err);
-          updateBTStatus("error");
-        }
-      }
+          const sx = Math.max(-1, Math.min(1, moveX / 9.81));
+          const sy = Math.max(-1, Math.min(1, moveY / 9.81));
 
-      async function disconnectBluetooth() {
-        if (sendIntervalId) {
-          clearInterval(sendIntervalId);
-          sendIntervalId = null;
+          dot.style.left = `${cx + sx * (rect.width / 2 - 30)}px`;
+          dot.style.top = `${cy - sy * (rect.height / 2 - 30)}px`; // Invert Y for natural movement
         }
-        if (!bleDevice) return;
-        try {
-          if (bleDevice.gatt.connected) await bleDevice.gatt.disconnect();
-        } catch (e) {}
-        bleDevice = null;
-        bleServer = null;
-        txChar = null;
-        btConnectBtn.disabled = false;
-        btDisconnectBtn.disabled = true;
-        updateBTStatus("disconnected");
-        const ctrlNameEl = document.getElementById("ctrlBtName");
-        const ctrlStatusEl = document.getElementById("ctrlBtStatus");
-        if (ctrlStatusEl) ctrlStatusEl.textContent = "disconnected";
-      }
 
-      function onDisconnected() {
-        updateBTStatus("disconnected (auto)");
-        btConnectBtn.disabled = false;
-        btDisconnectBtn.disabled = true;
-        if (sendIntervalId) {
-          clearInterval(sendIntervalId);
-          sendIntervalId = null;
-        }
-        const ctrlStatusEl = document.getElementById("ctrlBtStatus");
-        if (ctrlStatusEl) ctrlStatusEl.textContent = "disconnected";
-      }
-
-      async function sendIMUOverBT() {
-        if (!txChar) return;
-        const sample = {
-          gx: typeof last.gx === "number" ? (last.gx * 180) / Math.PI : 0,
-          gy: typeof last.gy === "number" ? (last.gy * 180) / Math.PI : 0,
-          gz: typeof last.gz === "number" ? (last.gz * 180) / Math.PI : 0,
-          ax: typeof last.ax === "number" ? last.ax : 0,
-          ay: typeof last.ay === "number" ? last.ay : 0,
-          az: typeof last.az === "number" ? last.az : 0,
-        };
-        const out = `Gx:${sample.gx.toFixed(3)} Gy:${sample.gy.toFixed(
-          3
-        )} Gz:${sample.gz.toFixed(3)} Ax:${sample.ax.toFixed(
-          3
-        )} Ay:${sample.ay.toFixed(3)} Az:${sample.az.toFixed(3)}\n`;
-        try {
-          const data = new TextEncoder().encode(out);
-          // Some characteristics may prefer writeWithoutResponse; writeValue will still work in many browsers.
-          await txChar.writeValue(data);
-        } catch (err) {
-          logBT("BT write failed", err);
+        async function startSensors() {
           try {
-            if (bleDevice && bleDevice.gatt.connected)
-              bleDevice.gatt.disconnect();
-          } catch (e) {}
-          onDisconnected();
-        }
-      }
+            if (!("Gyroscope" in window && "Accelerometer" in window)) {
+              if ("DeviceMotionEvent" in window) {
+                dmListener = (e) => {
+                  const acc = e.accelerationIncludingGravity;
+                  const rot = e.rotationRate;
+                  lastReading = {
+                    ax: acc.x,
+                    ay: acc.y,
+                    az: acc.z,
+                    gx: rot.beta,
+                    gy: rot.alpha,
+                    gz: rot.gamma,
+                  };
+                  updateReadouts();
+                };
+                const p = await DeviceMotionEvent.requestPermission?.();
+                if (p === "denied") {
+                  alert("Sensor permission denied.");
+                  return;
+                }
+                window.addEventListener("devicemotion", dmListener);
+                sourceEl.textContent = "DeviceMotion";
+              } else {
+                throw new Error("Sensor APIs not supported.");
+              }
+            } else {
+              sensors.accel = new Accelerometer({ frequency: 60 });
+              sensors.accel.addEventListener("reading", () => {
+                lastReading.ax = sensors.accel.x;
+                lastReading.ay = sensors.accel.y;
+                lastReading.az = sensors.accel.z;
+                updateReadouts();
+              });
+              await sensors.accel.start();
 
-      btConnectBtn.addEventListener("click", () => connectBluetooth());
-      btDisconnectBtn.addEventListener("click", () => disconnectBluetooth());
-
-      // --- Mode management for CTRL panel ---
-      let currentMode = null; // null = unknown; modes: 0 sleep,1 RC,2 obstacle,3 line
-      let lastSentMode = null;
-
-      function setModeUI(mode) {
-        // highlight selected mode button
-        document
-          .querySelectorAll(".modeBtn")
-          .forEach((b) =>
-            b.classList.toggle(
-              "active",
-              String(b.dataset.mode) === String(mode)
-            )
-          );
-        // show RC controls only when RC mode (1)
-        const rc = document.getElementById("rcControls");
-        if (rc) rc.style.display = mode === 1 ? "block" : "none";
-      }
-
-      function sendModeIfNeeded(mode) {
-        if (mode === null) return;
-        if (lastSentMode !== mode) {
-          // send single-byte mode code (as ASCII digit)
-          sendBTCommand(String(mode));
-          lastSentMode = mode;
-        }
-      }
-
-      function sendCommandWithMode(cmd) {
-        // ensure mode is sent first if changed
-        sendModeIfNeeded(currentMode);
-        // then send the command (single-letter)
-        sendBTCommand(cmd);
-      }
-
-      // wire mode buttons
-      document.querySelectorAll(".modeBtn").forEach((b) => {
-        b.addEventListener("click", (ev) => {
-          const m =
-            ev.currentTarget.dataset.mode !== undefined
-              ? Number(ev.currentTarget.dataset.mode)
-              : null;
-          // special '.' button (no-mode) sets mode to null and clears highlight
-          if (ev.currentTarget.id === "noModeBtn") {
-            currentMode = null;
-            lastSentMode = null;
-            document
-              .querySelectorAll(".modeBtn")
-              .forEach((x) => x.classList.remove("active"));
-            const rc = document.getElementById("rcControls");
-            if (rc) rc.style.display = "none";
-            // also send mode 0 (sleep) when the Sleep button is pressed separately via its own handler; here '.' means deselect
-            logBT("Mode cleared (no-mode)");
-            return;
+              sensors.gyro = new Gyroscope({ frequency: 60 });
+              sensors.gyro.addEventListener("reading", () => {
+                lastReading.gx = sensors.gyro.x;
+                lastReading.gy = sensors.gyro.y;
+                lastReading.gz = sensors.gyro.z;
+                updateReadouts();
+              });
+              await sensors.gyro.start();
+              sourceEl.textContent = "Generic Sensor";
+            }
+            uiState.sensorsRunning = true;
+          } catch (error) {
+            alert(`Could not start sensors: ${error.message}`);
+            uiState.sensorsRunning = false;
           }
-          currentMode = m;
-          setModeUI(m);
-          // if Sleep mode (0) was pressed, enlarge the pressed button briefly to help avoid mistouches
-          if (m === 0) {
-            ev.currentTarget.style.transform = "scale(1.08)";
-            setTimeout(() => (ev.currentTarget.style.transform = ""), 300);
-          }
-          // send mode immediately when changed
-          sendModeIfNeeded(currentMode);
-        });
-      });
-
-      // wire RC buttons to use sendCommandWithMode
-      document.querySelectorAll(".rcBtn").forEach((b) => {
-        b.addEventListener(
-          "touchstart",
-          (ev) => {
-            ev.preventDefault();
-            sendCommandWithMode(ev.currentTarget.dataset.cmd);
-          },
-          { passive: false }
-        );
-        b.addEventListener("mousedown", (ev) => {
-          ev.preventDefault();
-          sendCommandWithMode(ev.currentTarget.dataset.cmd);
-        });
-      });
-
-      // ensure we send current mode on startup (if any)
-      window.addEventListener("load", () => {
-        if (currentMode !== null) sendModeIfNeeded(currentMode);
-      });
-
-      // If user starts sensors while BT connected, keep sending
-      startBtn.addEventListener("click", () => {
-        if (
-          bleDevice &&
-          bleDevice.gatt &&
-          bleDevice.gatt.connected &&
-          !sendIntervalId
-        ) {
-          sendIntervalId = setInterval(sendIMUOverBT, 10);
         }
-      });
+
+        function stopSensors() {
+          sensors.gyro?.stop();
+          sensors.accel?.stop();
+          if (dmListener)
+            window.removeEventListener("devicemotion", dmListener);
+          sensors = { gyro: null, accel: null };
+          dmListener = null;
+          uiState.sensorsRunning = false;
+          resetReadouts();
+        }
+
+        function updateReadouts() {
+          if (!uiState.sensorsRunning) return;
+          axEl.textContent = fmt(lastReading.ax);
+          ayEl.textContent = fmt(lastReading.ay);
+          azEl.textContent = fmt(lastReading.az);
+          gxEl.textContent = fmt((lastReading.gx * 180) / Math.PI);
+          gyEl.textContent = fmt((lastReading.gy * 180) / Math.PI);
+          gzEl.textContent = fmt((lastReading.gz * 180) / Math.PI);
+          tsEl.textContent = Date.now();
+          moveDot();
+        }
+
+        function resetReadouts() {
+          axEl.textContent = ayEl.textContent = azEl.textContent = "—";
+          gxEl.textContent = gyEl.textContent = gzEl.textContent = "—";
+        }
+
+        btToggleBtn.addEventListener("click", toggleBluetooth);
+        gyroToggle.addEventListener("click", () => {
+          uiState.gyroOn = !uiState.gyroOn;
+          updateUIToggles();
+        });
+        accelToggle.addEventListener("click", () => {
+          uiState.accelOn = !uiState.accelOn;
+          updateUIToggles();
+        });
+
+        // Initial setup
+        updateUIToggles();
+        if (uiState.gyroOn || uiState.accelOn) {
+          startSensors();
+        }
+      })();
     </script>
   </body>
 </html>
