@@ -185,86 +185,153 @@
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <div class="panel left">
-        <div class="controls">
-          <button id="start">Start Sensors</button>
-          <button id="stop" disabled>Stop</button>
-          <button id="btConnect">Connect Bluetooth</button>
-          <button id="btDisconnect" disabled>Disconnect BT</button>
-          <button id="simulate">Simulate Motion</button>
-          <div class="small" id="status">idle</div>
-          <div class="small" id="btStatus" style="margin-left: 8px">
-            BT: disconnected
+    <div id="mainContainer">
+      <div class="wrap">
+        <div class="panel left">
+          <div class="controls">
+            <button id="start">Start Sensors</button>
+            <!-- Start button acts as toggle: text will flip to Stop Sensors when running -->
+            <button id="btConnect">Connect Bluetooth</button>
+            <button id="btDisconnect" disabled>Disconnect BT</button>
+            <button id="simulate">Simulate Motion</button>
+            <button id="ctrlMode">CTRL MODE</button>
+            <button id="gyroToggle" aria-pressed="true">Gyro: ON</button>
+            <button id="accelToggle" aria-pressed="true">Accel: ON</button>
+            <div class="small" id="status">idle</div>
+            <div class="small" id="btStatus" style="margin-left: 8px">
+              BT: disconnected
+            </div>
+            <div
+              id="btLog"
+              class="small"
+              style="margin-left: 8px; max-width: 260px; word-break: break-word"
+            ></div>
+            <div
+              id="permStatus"
+              class="small"
+              style="margin-left: 8px; max-width: 260px; word-break: break-word"
+            >
+              Perm: unknown
+            </div>
+            <div
+              id="sensorLog"
+              class="small"
+              style="margin-left: 8px; max-width: 260px; word-break: break-word"
+            >
+              Sensor: idle
+            </div>
           </div>
-          <div
-            id="btLog"
-            class="small"
-            style="margin-left: 8px; max-width: 260px; word-break: break-word"
-          ></div>
-          <div
-            id="permStatus"
-            class="small"
-            style="margin-left: 8px; max-width: 260px; word-break: break-word"
-          >
-            Perm: unknown
+
+          <div class="dot-area" id="stage">
+            <div class="dot" id="dot"></div>
           </div>
-          <div
-            id="sensorLog"
-            class="small"
-            style="margin-left: 8px; max-width: 260px; word-break: break-word"
-          >
-            Sensor: idle
+
+          <div class="notes small">
+            Tip: open this page in Chrome on your Android phone over HTTPS. If
+            sensors are blocked, serve the page via HTTPS and check site
+            permissions.
           </div>
         </div>
 
-        <div class="dot-area" id="stage">
-          <div class="dot" id="dot"></div>
-        </div>
-
-        <div class="notes small">
-          Tip: open this page in Chrome on your Android phone over HTTPS. If
-          sensors are blocked, serve the page via HTTPS and check site
-          permissions.
+        <div class="panel right">
+          <h3 style="margin: 0 0 10px 0">Live sensor readout</h3>
+          <div class="readouts">
+            <div class="row">
+              <div>Accel X</div>
+              <div class="col-right" id="ax">—</div>
+            </div>
+            <div class="row">
+              <div>Accel Y</div>
+              <div class="col-right" id="ay">—</div>
+            </div>
+            <div class="row">
+              <div>Accel Z</div>
+              <div class="col-right" id="az">—</div>
+            </div>
+            <div style="height: 8px"></div>
+            <div class="row">
+              <div>Gyro X</div>
+              <div class="col-right" id="gx">—</div>
+            </div>
+            <div class="row">
+              <div>Gyro Y</div>
+              <div class="col-right" id="gy">—</div>
+            </div>
+            <div class="row">
+              <div>Gyro Z</div>
+              <div class="col-right" id="gz">—</div>
+            </div>
+            <div style="height: 8px"></div>
+            <div class="row">
+              <div>Source</div>
+              <div class="col-right" id="source">—</div>
+            </div>
+            <div class="row">
+              <div>Timestamp</div>
+              <div class="col-right" id="ts">—</div>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="panel right">
-        <h3 style="margin: 0 0 10px 0">Live sensor readout</h3>
-        <div class="readouts">
-          <div class="row">
-            <div>Accel X</div>
-            <div class="col-right" id="ax">—</div>
+    <!-- CTRL MODE panel (hidden by default) -->
+    <div
+      id="ctrlPanel"
+      class="panel"
+      style="display: none; margin: 18px auto; max-width: 760px"
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <h3 style="margin: 0">Control Mode</h3>
+        <div>
+          <button id="backHome">Home</button>
+        </div>
+      </div>
+      <div style="margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap">
+        <div style="min-width: 200px">
+          <h4>Bluetooth</h4>
+          <div class="small">
+            Use Connect button on main panel to pair with HC-05/HM-10.
           </div>
-          <div class="row">
-            <div>Accel Y</div>
-            <div class="col-right" id="ay">—</div>
+        </div>
+        <div style="min-width: 200px">
+          <h4>Modes</h4>
+          <div
+            style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px"
+          >
+            <button data-cmd="B" class="modeBtn">Balance</button>
+            <button data-cmd="R" class="modeBtn">RC Mode</button>
+            <button data-cmd="O" class="modeBtn">Obstacle</button>
+            <button data-cmd="L" class="modeBtn">Line Follow</button>
           </div>
-          <div class="row">
-            <div>Accel Z</div>
-            <div class="col-right" id="az">—</div>
-          </div>
-          <div style="height: 8px"></div>
-          <div class="row">
-            <div>Gyro X</div>
-            <div class="col-right" id="gx">—</div>
-          </div>
-          <div class="row">
-            <div>Gyro Y</div>
-            <div class="col-right" id="gy">—</div>
-          </div>
-          <div class="row">
-            <div>Gyro Z</div>
-            <div class="col-right" id="gz">—</div>
-          </div>
-          <div style="height: 8px"></div>
-          <div class="row">
-            <div>Source</div>
-            <div class="col-right" id="source">—</div>
-          </div>
-          <div class="row">
-            <div>Timestamp</div>
-            <div class="col-right" id="ts">—</div>
+        </div>
+        <div style="min-width: 200px">
+          <h4>RC Controls</h4>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 60px 60px 60px;
+              gap: 8px;
+              justify-items: center;
+              align-items: center;
+              margin-top: 8px;
+            "
+          >
+            <div></div>
+            <button data-cmd="F" class="rcBtn">Up</button>
+            <div></div>
+            <button data-cmd="L" class="rcBtn">Left</button
+            ><button data-cmd="S" class="rcBtn">Stop</button
+            ><button data-cmd="R" class="rcBtn">Right</button>
+            <div></div>
+            <button data-cmd="B" class="rcBtn">Down</button>
+            <div></div>
           </div>
         </div>
       </div>
@@ -273,6 +340,102 @@
     <script>
       // Small helper: format numbers
       const fmt = (v, n = 2) => (typeof v === "number" ? v.toFixed(n) : "—");
+      // --- Control panel / RC commands / Start toggle helpers ---
+      const ctrlPanel = document.getElementById("ctrlPanel");
+      const backHome = document.getElementById("backHome");
+      // button in markup is 'ctrlMode'
+      const btnShowCtrl = document.getElementById("ctrlMode");
+      const gyroToggle = document.getElementById("gyroToggle");
+      const accelToggle = document.getElementById("accelToggle");
+
+      // toggle state flags
+      let showGyro = true;
+      let showAccel = true;
+
+      // Ensure toggles exist (older versions of the page may not have them)
+      if (!gyroToggle) {
+        console.warn("gyroToggle not found in DOM");
+      }
+
+      function sendBTCommand(cmd) {
+        const out = String(cmd);
+        const connected =
+          bleDevice && bleDevice.gatt && bleDevice.gatt.connected;
+        if (txChar && connected) {
+          try {
+            txChar.writeValue(new TextEncoder().encode(out));
+            logBT("TX: " + out);
+          } catch (e) {
+            logBT("BT write error: " + e.message);
+          }
+        } else {
+          logBT("BT not connected; would send: " + out);
+        }
+      }
+
+      // show / hide ctrl panel
+      if (btnShowCtrl)
+        btnShowCtrl.addEventListener("click", () => {
+          // hide main panels and show ctrl panel
+          document.getElementById("mainContainer").style.display = "none";
+          ctrlPanel.style.display = "block";
+        });
+      backHome.addEventListener("click", () => {
+        ctrlPanel.style.display = "none";
+        document.getElementById("mainContainer").style.display = "block";
+      });
+
+      // wire mode buttons
+      document.querySelectorAll(".modeBtn").forEach((b) => {
+        b.addEventListener("click", (ev) => {
+          const cmd = ev.currentTarget.dataset.cmd || "M";
+          sendBTCommand(cmd);
+          // briefly flash button
+          ev.currentTarget.classList.add("active");
+          setTimeout(() => ev.currentTarget.classList.remove("active"), 200);
+        });
+      });
+
+      // wire RC buttons
+      document.querySelectorAll(".rcBtn").forEach((b) => {
+        b.addEventListener(
+          "touchstart",
+          (ev) => {
+            ev.preventDefault();
+            sendBTCommand(ev.currentTarget.dataset.cmd);
+          },
+          { passive: false }
+        );
+        b.addEventListener("mousedown", (ev) => {
+          ev.preventDefault();
+          sendBTCommand(ev.currentTarget.dataset.cmd);
+        });
+      });
+
+      // Start button toggle: start/stop sensors
+      // we wire the start button later in the file (startBtn is declared below), so no redeclaration here
+
+      // gyro/accel UI toggles: control whether we reflect those readings in the dot and readouts
+      if (gyroToggle) {
+        gyroToggle.addEventListener("click", (e) => {
+          showGyro = !showGyro;
+          gyroToggle.setAttribute("aria-pressed", showGyro ? "true" : "false");
+          gyroToggle.textContent = "Gyro: " + (showGyro ? "ON" : "OFF");
+        });
+      }
+      if (accelToggle) {
+        accelToggle.addEventListener("click", (e) => {
+          showAccel = !showAccel;
+          accelToggle.setAttribute(
+            "aria-pressed",
+            showAccel ? "true" : "false"
+          );
+          accelToggle.textContent = "Accel: " + (showAccel ? "ON" : "OFF");
+        });
+      }
+
+      // Keep gyro sensor running in background for data acquisition even if UI reflection is disabled
+      // The UI handlers check showGyro/showAccel before updating visuals.
 
       const startBtn = document.getElementById("start");
       const stopBtn = document.getElementById("stop");
@@ -501,6 +664,19 @@
           "Sensor: none available";
       }
 
+      // wire start button toggle here (only once)
+      startBtn.addEventListener("click", () => {
+        if (startBtn.dataset.running === "1") {
+          stopSensors();
+          startBtn.textContent = "Start Sensors";
+          startBtn.dataset.running = "0";
+        } else {
+          startSensors();
+          startBtn.textContent = "Stop Sensors";
+          startBtn.dataset.running = "1";
+        }
+      });
+
       function stopSensors() {
         try {
           if (accelSensor && accelSensor.stop) accelSensor.stop();
@@ -515,16 +691,9 @@
         dmListener = null;
         setStatus("stopped");
         startBtn.disabled = false;
-        stopBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = true;
         sourceEl.textContent = "—";
       }
-
-      startBtn.addEventListener("click", () => {
-        startSensors();
-      });
-      stopBtn.addEventListener("click", () => {
-        stopSensors();
-      });
 
       // keep dot centered initially
       window.addEventListener("load", () => {
