@@ -1,316 +1,135 @@
 <!DOCTYPE html>
-<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>IMU Fast Stream (Accel + Gyro)</title>
-  <style>
-    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa6bf;--accent:#4fd1c5;--danger:#ff6b6b}
-    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,system-ui,Arial;background:linear-gradient(180deg,#071021 0%,#071829 100%);color:#e6eef8}
-    main{max-width:980px;margin:18px auto;padding:14px}
-    h1{font-size:1.2rem;margin:0 0 10px}
-    #controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-    button{background:#051229;border:1px solid rgba(255,255,255,0.04);color:var(--accent);padding:10px 12px;border-radius:10px;font-weight:600}
-    button:disabled{opacity:.45}
-    #display{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-    .panel{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
-    pre{margin:0;color:var(--muted);font-size:0.95rem}
-    #dotWrap{position:relative;height:220px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);border-radius:12px;overflow:hidden;margin-bottom:12px}
-    .dot{position:absolute;width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7ef5df,#2bc4b6);box-shadow:0 6px 18px rgba(43,196,182,0.16);left:calc(50% - 14px);top:calc(50% - 14px);transform:translateZ(0)}
-    #logs{display:flex;gap:8px;flex-wrap:wrap}
-    #logs>div{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;color:var(--muted);font-size:0.9rem}
-    @media(max-width:600px){#display{grid-template-columns:1fr}button{flex:1}}
-  </style>
-</head>
-<body>
-  <main>
-    <h1>IMU Fast Stream — Gyro & Accel</h1>
-
-    <div id="controls">
-      <button id="start">Start Sensors</button>
-      <button id="stop" disabled>Stop Sensors</button>
-      <button id="simulate">Simulate Motion</button>
-      <button id="btConnect">Connect BLE</button>
-      <button id="btDisconnect" disabled>Disconnect BLE</button>
-    </div>
-
-    <section id="display">
-      <div class="panel">
-        <h2>Accelerometer (m/s²)</h2>
-        <pre id="acc">x: -  y: -  z: -</pre>
-      </div>
-      <div class="panel">
-        <h2>Gyroscope (rad/s)</h2>
-        <pre id="gyro">x: -  y: -  z: -</pre>
-      </div>
-    </section>
-
-    <div id="dotWrap">
-      <div id="dot" class="dot"></div>
-    </div>
-
-    <div id="logs">
-      <div id="permStatus">Perm: -</div>
-      <div id="sensorLog">Sensor: idle</div>
-      <div id="btLog">BT: disconnected</div>
-    </div>
-  </main>
-
-  <script>
-    // High-level contract
-    // Inputs: device sensors (accelerometer in m/s^2, gyroscope in rad/s) or DeviceMotion fallback
-    // Outputs: live UI, optional BLE write stream: "AX:.. AY:.. AZ:.. GX:.. GY:.. GZ:..\n"
-    // Error modes: missing permissions, unsupported APIs, BLE unavailable
-
-    const $ = id => document.getElementById(id);
-    const startBtn = $('start'), stopBtn = $('stop'), simBtn = $('simulate');
-    const btConnectBtn = $('btConnect'), btDisconnectBtn = $('btDisconnect');
-    const accEl = $('acc'), gyroEl = $('gyro');
-    const permEl = $('permStatus'), sensorLogEl = $('sensorLog'), btLogEl = $('btLog');
-    const dot = $('dot'), dotWrap = $('dotWrap');
-
-    // State
-    let accel = {x:0,y:0,z:0}, gyro = {x:0,y:0,z:0};
-    let usingGeneric = false, usingDeviceMotion = false;
-    let accelSensor, gyroSensor; // Generic Sensor API instances
-    let deviceMotionHandler = null; // fallback
-    let simulate = false, simTimer = null;
-
-    // BLE state
-    let bleDevice = null, bleServer = null, bleChar = null;
-    const NUS_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e'; // optional
-    const NUS_TX  = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
-
-    // Write queue (circular buffer) to avoid backlog. Small size to keep latency low.
-    const QUEUE_SIZE = 64; // messages
-    let writeQueue = new Array(QUEUE_SIZE);
-    let writeHead = 0, writeTail = 0, writeCount = 0;
-    let writerInterval = null; // sender timer
-
-    function enqueueWrite(buf){
-      if(writeCount >= QUEUE_SIZE) return false; // drop oldest if full
-      writeQueue[writeTail] = buf;
-      writeTail = (writeTail + 1) % QUEUE_SIZE;
-      writeCount++;
-      return true;
-    }
-    function dequeueWrite(){
-      if(writeCount === 0) return null;
-      const v = writeQueue[writeHead];
-      writeQueue[writeHead] = null;
-      writeHead = (writeHead + 1) % QUEUE_SIZE;
-      writeCount--;
-      return v;
-    }
-
-    function fmt(n){return (n===undefined||n===null)?'-':n.toFixed(3)}
-
-    // fast UI update (throttle to animation frame)
-    let rafPending = false;
-    function scheduleUI(){ if(rafPending) return; rafPending=true; requestAnimationFrame(()=>{ rafPending=false; updateUI(); }); }
-    function updateUI(){
-      accEl.textContent = `x: ${fmt(accel.x)}  y: ${fmt(accel.y)}  z: ${fmt(accel.z)}`;
-      gyroEl.textContent = `x: ${fmt(gyro.x)}  y: ${fmt(gyro.y)}  z: ${fmt(gyro.z)}`;
-      moveDotFromAccel(accel.x, accel.y);
-    }
-
-    function moveDotFromAccel(ax, ay){
-      // map acceleration (clamped) to pixel offset within dotWrap
-      const wrap = dotWrap.getBoundingClientRect();
-      const cx = wrap.width/2 - 14, cy = wrap.height/2 - 14;
-      // tuning: assume +-12 m/s2 comfortable
-      const max = 12;
-      const nx = Math.max(-1, Math.min(1, ax / max));
-      const ny = Math.max(-1, Math.min(1, ay / max));
-      const px = cx + nx * (wrap.width/2 - 20);
-      const py = cy + ny * (wrap.height/2 - 20);
-      dot.style.left = px + 'px';
-      dot.style.top  = py + 'px';
-    }
-
-    // Sensor startup
-    async function startSensors(){
-      sensorLogEl.textContent = 'Sensor: starting...';
-      // prefer Generic Sensor API
-      try{
-        if('Accelerometer' in window && 'Gyroscope' in window){
-          usingGeneric = true;
-          accelSensor = new Accelerometer({frequency: 100});
-          gyroSensor  = new Gyroscope({frequency: 100});
-
-          accelSensor.addEventListener('reading', ()=>{
-            accel.x = accelSensor.x || 0; accel.y = accelSensor.y || 0; accel.z = accelSensor.z || 0;
-            scheduleUI();
-            queueIMU();
-          });
-          gyroSensor.addEventListener('reading', ()=>{
-            // Gyroscope from Generic Sensor API is in rad/s
-            gyro.x = gyroSensor.x || 0; gyro.y = gyroSensor.y || 0; gyro.z = gyroSensor.z || 0;
-            scheduleUI();
-            queueIMU();
-          });
-          accelSensor.start(); gyroSensor.start();
-          sensorLogEl.textContent = 'Sensor: generic active';
-          startBtn.disabled = true; stopBtn.disabled = false;
-          return;
-        }
-      }catch(err){ console.warn('GenericSensor error',err); }
-
-      // fallback to DeviceMotionEvent
-      if('DeviceMotionEvent' in window){
-        usingDeviceMotion = true;
-        deviceMotionHandler = (ev)=>{
-          // rotationRate is in deg/s; convert to rad/s
-          const rr = ev.rotationRate || {};
-          const acc = ev.acceleration || ev.accelerationIncludingGravity || {};
-          accel.x = acc.x || 0; accel.y = acc.y || 0; accel.z = acc.z || 0;
-          const d2r = Math.PI/180;
-          gyro.x = (rr.alpha||0)*d2r; gyro.y = (rr.beta||0)*d2r; gyro.z = (rr.gamma||0)*d2r;
-          scheduleUI();
-          queueIMU();
-        };
-
-        // iOS 13+ requires permission via requestPermission
-        if(typeof DeviceMotionEvent.requestPermission === 'function'){
-          try{
-            const resp = await DeviceMotionEvent.requestPermission();
-            if(resp !== 'granted'){ sensorLogEl.textContent='Sensor: permission denied'; return; }
-          }catch(e){ sensorLogEl.textContent='Sensor: permission request failed'; return; }
-        }
-
-        window.addEventListener('devicemotion', deviceMotionHandler, {passive:true});
-        sensorLogEl.textContent = 'Sensor: devicemotion active';
-        startBtn.disabled = true; stopBtn.disabled = false;
-        return;
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>IMU Live — gyro & accel</title>
+    <style>
+      :root {
+        --bg: #071426;
+        --card: #072033;
+        --card-2: #0b2230;
+        --accent1: #06b6d4;
+        --accent2: #7c3aed;
+        --muted: #9fb3c8;
+        --glass: rgba(255, 255, 255, 0.04);
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial;
+        color: #e6eef6;
+        background: linear-gradient(180deg, var(--bg) 0%, #021420 100%);
       }
 
-      sensorLogEl.textContent = 'Sensor: not supported';
-    }
-
-    function stopSensors(){
-      if(usingGeneric){ try{ accelSensor.stop(); gyroSensor.stop(); }catch(e){} accelSensor=null; gyroSensor=null; usingGeneric=false; }
-      if(usingDeviceMotion && deviceMotionHandler){ window.removeEventListener('devicemotion', deviceMotionHandler); deviceMotionHandler=null; usingDeviceMotion=false; }
-      sensorLogEl.textContent = 'Sensor: stopped';
-      startBtn.disabled = false; stopBtn.disabled = true;
-    }
-
-    // fast IMU formatting and enqueueing
-    function queueIMU(){
-      if(!bleChar || !bleDevice || bleDevice.gatt === undefined) return; // not connected
-      // Build a compact line (binary would be smaller, but we use simple text)
-      // Example: "AX:0.123 AY:0.234 AZ:-0.100 GX:0.001 GY:0.002 GZ:0.003\n"
-      const line = `AX:${accel.x.toFixed(3)} AY:${accel.y.toFixed(3)} AZ:${accel.z.toFixed(3)} `+
-                   `GX:${gyro.x.toFixed(4)} GY:${gyro.y.toFixed(4)} GZ:${gyro.z.toFixed(4)}\n`;
-      // encode to utf8
-      const encoder = new TextEncoder();
-      enqueueWrite(encoder.encode(line));
-    }
-
-    // BLE connect/disconnect
-    async function connectBLE(){
-      btLogEl.textContent = 'BT: requesting device...';
-      try{
-        bleDevice = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:[NUS_UUID]});
-        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-        btLogEl.textContent = `BT: connecting to ${bleDevice.name || bleDevice.id}`;
-        bleServer = await bleDevice.gatt.connect();
-
-        // try NUS first
-        try{
-          const service = await bleServer.getPrimaryService(NUS_UUID);
-          bleChar = await service.getCharacteristic(NUS_TX);
-        }catch(e){
-          // pick first writable characteristic from all services
-          const services = await bleServer.getPrimaryServices();
-          let found = false;
-          for(const s of services){
-            const chars = await s.getCharacteristics();
-            for(const c of chars){
-              const props = c.properties;
-              if(props.write || props.writeWithoutResponse){ bleChar = c; found=true; break; }
-            }
-            if(found) break;
-          }
-        }
-
-        if(!bleChar) { btLogEl.textContent = 'BT: no writable characteristic found'; return; }
-
-        btLogEl.textContent = 'BT: connected';
-        btConnectBtn.disabled = true; btDisconnectBtn.disabled = false;
-
-        // start writer loop with ~10ms ticks; use writeWithoutResponse when possible to keep low-latency
-        if(writerInterval) clearInterval(writerInterval);
-        writerInterval = setInterval(processWriteQueue, 10);
-      }catch(err){ console.error(err); btLogEl.textContent = 'BT: connect failed - '+(err.message||err); }
-    }
-
-    function onDisconnected(){ btLogEl.textContent='BT: disconnected'; btConnectBtn.disabled=false; btDisconnectBtn.disabled=true; if(writerInterval){ clearInterval(writerInterval); writerInterval=null; } }
-
-    async function disconnectBLE(){
-      if(bleDevice && bleDevice.gatt && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
-      bleDevice=null; bleServer=null; bleChar=null;
-      btLogEl.textContent='BT: disconnected'; btConnectBtn.disabled=false; btDisconnectBtn.disabled=true;
-      if(writerInterval){ clearInterval(writerInterval); writerInterval=null; }
-    }
-
-    async function processWriteQueue(){
-      if(!bleChar) return;
-      // send up to N packets per tick to empty quickly but avoid flooding
-      const maxPerTick = 3;
-      for(let i=0;i<maxPerTick;i++){
-        const buf = dequeueWrite();
-        if(!buf) break;
-        try{
-          // prefer writeWithoutResponse for speed
-          if(bleChar.properties.writeWithoutResponse) await bleChar.writeValueWithoutResponse(buf);
-          else await bleChar.writeValue(buf);
-        }catch(err){ console.warn('BLE write err',err); btLogEl.textContent='BT: write error'; }
+      /* layout */
+      .wrap {
+        max-width: 980px;
+        margin: 18px auto;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 18px;
+        width: calc(100% - 24px);
       }
-    }
+      .panel {
+        background: linear-gradient(180deg, var(--card), var(--card-2));
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 8px 30px rgba(2, 8, 18, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.03);
+      }
 
-    // Simulation for debugging without sensors
-    function startSimulation(){
-      simulate = true; simTimer = setInterval(()=>{
-        const t = Date.now()/1000;
-        accel.x = Math.sin(t*2)*4; accel.y = Math.cos(t*1.7)*3; accel.z = Math.sin(t*1.3)*1;
-        gyro.x = Math.sin(t*4)*0.02; gyro.y = Math.cos(t*3.7)*0.015; gyro.z = Math.sin(t*2.2)*0.01;
-        scheduleUI(); queueIMU();
-      }, 20);
-      sensorLogEl.textContent='Sensor: simulation';
-      startBtn.disabled=true; stopBtn.disabled=false; simBtn.textContent='Stop Simulation';
-    }
-    function stopSimulation(){ simulate=false; if(simTimer) clearInterval(simTimer); simTimer=null; sensorLogEl.textContent='Sensor: simulation stopped'; startBtn.disabled=false; stopBtn.disabled=true; simBtn.textContent='Simulate Motion'; }
+      /* left column */
+      .left {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      button {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          rgba(255, 255, 255, 0.01)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: inherit;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      .small {
+        font-size: 13px;
+        color: var(--muted);
+      }
 
-    // Permissions quick check
-    async function checkPermissions(){
-      try{
-        if(navigator.permissions){
-          const accP = await navigator.permissions.query({name:'accelerometer'}).catch(()=>null);
-          const gyroP = await navigator.permissions.query({name:'gyroscope'}).catch(()=>null);
-          permEl.textContent = `Perm: accel=${accP?accP.state:'?'} gyro=${gyroP?gyroP.state:'?'} `;
-        }
-      }catch(e){ permEl.textContent='Perm: unknown'; }
-    }
+      .dot-area {
+        position: relative;
+        min-height: 320px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.02),
+          transparent
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .dot {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 56px;
+        height: 56px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent1), var(--accent2));
+        box-shadow: 0 18px 40px rgba(12, 52, 68, 0.35),
+          inset 0 -8px 22px rgba(255, 255, 255, 0.03);
+        transition: transform 0.08s linear, left 0.08s linear, top 0.08s linear;
+      }
 
-    // Wire up UI
-    startBtn.addEventListener('click', async ()=>{ await checkPermissions(); startSensors(); });
-    stopBtn.addEventListener('click', ()=>{ stopSensors(); stopSimulation(); });
-    simBtn.addEventListener('click', ()=>{ if(simulate) stopSimulation(); else startSimulation(); });
-    btConnectBtn.addEventListener('click', connectBLE);
-    btDisconnectBtn.addEventListener('click', disconnectBLE);
-
-    // attempt a permissions check at load
-    checkPermissions();
-
-    // small helpful hint for visibility on orientation changes
-    window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ scheduleUI(); },120); });
-
-    // expose for debugging
-    window._imu = {accel,gyro,enqueueWrite, dequeueWrite};
-  </script>
-</body>
-</html>
+      /* right column */
+      .readouts {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: Menlo, Monaco, monospace;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.01),
+          transparent
+        );
+        padding: 8px;
+        border-radius: 8px;
+      }
+      .col-right {
+        padding-left: 10px;
+        color: #e6eef6;
+      }
+      h3 {
         margin: 0 0 8px 0;
       }
       .notes {
