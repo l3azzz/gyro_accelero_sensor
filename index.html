@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phone IMU Viewer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f2f2f2;
+        color: #333;
+        padding: 20px;
+      }
+      h1 {
+        text-align: center;
+      }
+      .sensor-box {
+        background: #fff;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      }
+      .sensor-box h2 {
+        margin-top: 0;
+      }
+      .value {
+        font-size: 1.2em;
+        margin: 5px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Phone IMU Viewer</h1>
+
+    <div class="sensor-box">
+      <h2>Accelerometer (m/s²)</h2>
+      <div class="value" id="ax">AX: 0</div>
+      <div class="value" id="ay">AY: 0</div>
+      <div class="value" id="az">AZ: 0</div>
+    </div>
+
+    <div class="sensor-box">
+      <h2>Gyroscope (°/s)</h2>
+      <div class="value" id="gx">GX: 0</div>
+      <div class="value" id="gy">GY: 0</div>
+      <div class="value" id="gz">GZ: 0</div>
+    </div>
+
+    <script>
+      if (window.DeviceMotionEvent) {
+        window.addEventListener("devicemotion", function (event) {
+          const ax = event.acceleration.x ? event.acceleration.x.toFixed(2) : 0;
+          const ay = event.acceleration.y ? event.acceleration.y.toFixed(2) : 0;
+          const az = event.acceleration.z ? event.acceleration.z.toFixed(2) : 0;
+          document.getElementById("ax").textContent = "AX: " + ax;
+          document.getElementById("ay").textContent = "AY: " + ay;
+          document.getElementById("az").textContent = "AZ: " + az;
+        });
+      }
+
+      if (window.DeviceOrientationEvent) {
+        window.addEventListener("deviceorientation", function (event) {
+          const gx = event.gamma ? event.gamma.toFixed(2) : 0; // rotation around X-axis
+          const gy = event.beta ? event.beta.toFixed(2) : 0; // rotation around Y-axis
+          const gz = event.alpha ? event.alpha.toFixed(2) : 0; // rotation around Z-axis
+          document.getElementById("gx").textContent = "GX: " + gx;
+          document.getElementById("gy").textContent = "GY: " + gy;
+          document.getElementById("gz").textContent = "GZ: " + gz;
+        });
+      } else {
+        alert(
+          "Your browser does not support DeviceMotion/DeviceOrientation events."
+        );
+      }
+    </script>
+  </body>
+</html>
