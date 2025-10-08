@@ -286,6 +286,8 @@
           display: flex;
           justify-content: space-between;
           align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
         "
       >
         <h3 style="margin: 0">Control Mode</h3>
@@ -293,44 +295,155 @@
           <button id="backHome">Home</button>
         </div>
       </div>
-      <div style="margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap">
-        <div style="min-width: 200px">
+
+      <div
+        style="
+          margin-top: 12px;
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          align-items: flex-start;
+        "
+      >
+        <!-- Bluetooth info inside control panel only -->
+        <div style="flex: 1 1 220px; min-width: 200px">
           <h4>Bluetooth</h4>
+          <div class="small">Device: <span id="ctrlBtName">—</span></div>
           <div class="small">
-            Use Connect button on main panel to pair with HC-05/HM-10.
+            Status: <span id="ctrlBtStatus">disconnected</span>
           </div>
         </div>
-        <div style="min-width: 200px">
+
+        <!-- Modes area: Sleep (0), RC (1), Obstacle (2), Line Follow (3) -->
+        <div style="flex: 1 1 260px; min-width: 220px">
           <h4>Modes</h4>
           <div
-            style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px"
+            id="modesWrap"
+            style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px"
           >
-            <button data-cmd="B" class="modeBtn">Balance</button>
-            <button data-cmd="R" class="modeBtn">RC Mode</button>
-            <button data-cmd="O" class="modeBtn">Obstacle</button>
-            <button data-cmd="L" class="modeBtn">Line Follow</button>
+            <button
+              data-mode="0"
+              class="modeBtn mode-sleep"
+              style="padding: 14px 18px; font-weight: 700; font-size: 16px"
+            >
+              Sleep
+            </button>
+            <button data-mode="1" class="modeBtn">RC Mode</button>
+            <button data-mode="2" class="modeBtn">Obstacle</button>
+            <button data-mode="3" class="modeBtn">Line Follow</button>
+            <button
+              id="noModeBtn"
+              title="No mode"
+              class="modeBtn"
+              style="width: 44px"
+            >
+              .
+            </button>
           </div>
         </div>
-        <div style="min-width: 200px">
+
+        <!-- RC Controls: visible only when RC Mode active -->
+        <div
+          id="rcControls"
+          style="flex: 1 1 240px; min-width: 200px; display: none"
+        >
           <h4>RC Controls</h4>
           <div
             style="
               display: grid;
-              grid-template-columns: 60px 60px 60px;
-              gap: 8px;
+              grid-template-columns: 64px 64px 64px;
+              gap: 10px;
               justify-items: center;
               align-items: center;
               margin-top: 8px;
             "
           >
             <div></div>
-            <button data-cmd="F" class="rcBtn">Up</button>
+            <button data-cmd="F" class="rcBtn svgBtn" title="Forward">
+              <!-- up arrow -->
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="7 14 12 9 17 14"></polyline>
+              </svg>
+            </button>
             <div></div>
-            <button data-cmd="L" class="rcBtn">Left</button
-            ><button data-cmd="S" class="rcBtn">Stop</button
-            ><button data-cmd="R" class="rcBtn">Right</button>
+
+            <button data-cmd="L" class="rcBtn svgBtn" title="Left">
+              <!-- left arrow -->
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="14 7 9 12 14 17"></polyline>
+              </svg>
+            </button>
+            <button
+              data-cmd="S"
+              class="rcBtn svgBtn"
+              title="Stop"
+              style="
+                border-radius: 6px;
+                background: rgba(255, 255, 255, 0.03);
+                width: 64px;
+                height: 64px;
+              "
+            >
+              <!-- square stop -->
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <rect x="6" y="6" width="12" height="12"></rect>
+              </svg>
+            </button>
+            <button data-cmd="R" class="rcBtn svgBtn" title="Right">
+              <!-- right arrow -->
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="10 7 15 12 10 17"></polyline>
+              </svg>
+            </button>
+
             <div></div>
-            <button data-cmd="B" class="rcBtn">Down</button>
+            <button data-cmd="B" class="rcBtn svgBtn" title="Backward">
+              <!-- down arrow -->
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="7 10 12 15 17 10"></polyline>
+              </svg>
+            </button>
             <div></div>
           </div>
         </div>
@@ -811,6 +924,12 @@
           if (sendIntervalId) clearInterval(sendIntervalId);
           sendIntervalId = setInterval(sendIMUOverBT, 10);
           logBT("Send loop started");
+          // update ctrl panel BT info
+          const ctrlNameEl = document.getElementById("ctrlBtName");
+          const ctrlStatusEl = document.getElementById("ctrlBtStatus");
+          if (ctrlNameEl)
+            ctrlNameEl.textContent = bleDevice.name || bleDevice.id || "—";
+          if (ctrlStatusEl) ctrlStatusEl.textContent = "connected";
         } catch (err) {
           logBT("BT connect error", err);
           updateBTStatus("error");
@@ -832,6 +951,9 @@
         btConnectBtn.disabled = false;
         btDisconnectBtn.disabled = true;
         updateBTStatus("disconnected");
+        const ctrlNameEl = document.getElementById("ctrlBtName");
+        const ctrlStatusEl = document.getElementById("ctrlBtStatus");
+        if (ctrlStatusEl) ctrlStatusEl.textContent = "disconnected";
       }
 
       function onDisconnected() {
@@ -842,6 +964,8 @@
           clearInterval(sendIntervalId);
           sendIntervalId = null;
         }
+        const ctrlStatusEl = document.getElementById("ctrlBtStatus");
+        if (ctrlStatusEl) ctrlStatusEl.textContent = "disconnected";
       }
 
       async function sendIMUOverBT() {
@@ -875,6 +999,94 @@
 
       btConnectBtn.addEventListener("click", () => connectBluetooth());
       btDisconnectBtn.addEventListener("click", () => disconnectBluetooth());
+
+      // --- Mode management for CTRL panel ---
+      let currentMode = null; // null = unknown; modes: 0 sleep,1 RC,2 obstacle,3 line
+      let lastSentMode = null;
+
+      function setModeUI(mode) {
+        // highlight selected mode button
+        document
+          .querySelectorAll(".modeBtn")
+          .forEach((b) =>
+            b.classList.toggle(
+              "active",
+              String(b.dataset.mode) === String(mode)
+            )
+          );
+        // show RC controls only when RC mode (1)
+        const rc = document.getElementById("rcControls");
+        if (rc) rc.style.display = mode === 1 ? "block" : "none";
+      }
+
+      function sendModeIfNeeded(mode) {
+        if (mode === null) return;
+        if (lastSentMode !== mode) {
+          // send single-byte mode code (as ASCII digit)
+          sendBTCommand(String(mode));
+          lastSentMode = mode;
+        }
+      }
+
+      function sendCommandWithMode(cmd) {
+        // ensure mode is sent first if changed
+        sendModeIfNeeded(currentMode);
+        // then send the command (single-letter)
+        sendBTCommand(cmd);
+      }
+
+      // wire mode buttons
+      document.querySelectorAll(".modeBtn").forEach((b) => {
+        b.addEventListener("click", (ev) => {
+          const m =
+            ev.currentTarget.dataset.mode !== undefined
+              ? Number(ev.currentTarget.dataset.mode)
+              : null;
+          // special '.' button (no-mode) sets mode to null and clears highlight
+          if (ev.currentTarget.id === "noModeBtn") {
+            currentMode = null;
+            lastSentMode = null;
+            document
+              .querySelectorAll(".modeBtn")
+              .forEach((x) => x.classList.remove("active"));
+            const rc = document.getElementById("rcControls");
+            if (rc) rc.style.display = "none";
+            // also send mode 0 (sleep) when the Sleep button is pressed separately via its own handler; here '.' means deselect
+            logBT("Mode cleared (no-mode)");
+            return;
+          }
+          currentMode = m;
+          setModeUI(m);
+          // if Sleep mode (0) was pressed, enlarge the pressed button briefly to help avoid mistouches
+          if (m === 0) {
+            ev.currentTarget.style.transform = "scale(1.08)";
+            setTimeout(() => (ev.currentTarget.style.transform = ""), 300);
+          }
+          // send mode immediately when changed
+          sendModeIfNeeded(currentMode);
+        });
+      });
+
+      // wire RC buttons to use sendCommandWithMode
+      document.querySelectorAll(".rcBtn").forEach((b) => {
+        b.addEventListener(
+          "touchstart",
+          (ev) => {
+            ev.preventDefault();
+            sendCommandWithMode(ev.currentTarget.dataset.cmd);
+          },
+          { passive: false }
+        );
+        b.addEventListener("mousedown", (ev) => {
+          ev.preventDefault();
+          sendCommandWithMode(ev.currentTarget.dataset.cmd);
+        });
+      });
+
+      // ensure we send current mode on startup (if any)
+      window.addEventListener("load", () => {
+        if (currentMode !== null) sendModeIfNeeded(currentMode);
+      });
 
       // If user starts sensors while BT connected, keep sending
       startBtn.addEventListener("click", () => {
