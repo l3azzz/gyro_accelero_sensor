@@ -141,6 +141,78 @@
         line-height: 1.4;
       }
 
+      /* CTRL Panel Styles */
+      .ctrl-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .ctrl-content {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .ctrl-section {
+        flex: 1;
+        min-width: 200px;
+        background: rgba(255, 255, 255, 0.02);
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .ctrl-section h4 {
+        margin: 0 0 12px 0;
+        color: var(--accent1);
+      }
+
+      .mode-buttons {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .mode-btn {
+        padding: 12px 16px;
+        text-align: center;
+        font-size: 14px;
+        border-radius: 8px;
+        transition: all 0.3s;
+      }
+
+      .mode-btn.selected {
+        background-color: var(--accent2);
+        color: #fff;
+      }
+
+      .rc-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr 1fr;
+        gap: 8px;
+        max-width: 200px;
+        margin-top: 15px;
+      }
+
+      .rc-btn {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        border-radius: 8px;
+      }
+
+      .rc-btn:active {
+        background-color: var(--accent1);
+        transform: scale(0.95);
+      }
+
       @media (max-width: 820px) {
         .wrap {
           grid-template-columns: 1fr;
@@ -158,6 +230,9 @@
         }
         .readouts {
           order: -1;
+        }
+        .ctrl-content {
+          flex-direction: column;
         }
       }
       @media (max-width: 480px) {
@@ -241,12 +316,57 @@
       </div>
     </div>
 
+    <!-- CTRL MODE Panel -->
     <div
       id="ctrlPanel"
       class="panel"
-      style="display: none; margin: 18px auto; max-width: 760px"
+      style="display: none; margin: 18px auto; max-width: 900px"
     >
-      <!-- Content for CTRL MODE -->
+      <div class="ctrl-header">
+        <h3>Robot Control Panel</h3>
+        <button id="backHome">← Back to Home</button>
+      </div>
+
+      <div class="ctrl-content">
+        <!-- Bluetooth Status Section -->
+        <div class="ctrl-section">
+          <h4>Bluetooth Connection</h4>
+          <div class="small">Device: <span id="ctrlBtDevice">—</span></div>
+          <div class="small">
+            Status: <span id="ctrlBtStatus">Disconnected</span>
+          </div>
+        </div>
+
+        <!-- Mode Selection Section -->
+        <div class="ctrl-section">
+          <h4>Robot Modes</h4>
+          <div class="mode-buttons">
+            <button class="mode-btn" data-mode="0">Sleep</button>
+            <button class="mode-btn" data-mode="1">RC Mode</button>
+            <button class="mode-btn" data-mode="2">Obstacle</button>
+            <button class="mode-btn" data-mode="3">Line Follow</button>
+          </div>
+          <div class="small" style="margin-top: 10px">
+            Active Mode: <span id="activeMode">None</span>
+          </div>
+        </div>
+
+        <!-- RC Controls Section -->
+        <div class="ctrl-section" id="rcSection" style="display: none">
+          <h4>RC Controls</h4>
+          <div class="rc-controls">
+            <div></div>
+            <button class="rc-btn" data-cmd="F">⬆</button>
+            <div></div>
+            <button class="rc-btn" data-cmd="L">⬅</button>
+            <button class="rc-btn" data-cmd="S">⏹</button>
+            <button class="rc-btn" data-cmd="R">➡</button>
+            <div></div>
+            <button class="rc-btn" data-cmd="B">⬇</button>
+            <div></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -254,8 +374,12 @@
         const btToggleBtn = document.getElementById("btToggle");
         const gyroToggle = document.getElementById("gyroToggle");
         const accelToggle = document.getElementById("accelToggle");
+        const ctrlModeBtn = document.getElementById("ctrlMode");
         const dot = document.getElementById("dot");
         const stage = document.getElementById("stage");
+        const mainContainer = document.getElementById("mainContainer");
+        const ctrlPanel = document.getElementById("ctrlPanel");
+        const backHomeBtn = document.getElementById("backHome");
 
         const axEl = document.getElementById("ax");
         const ayEl = document.getElementById("ay");
@@ -265,9 +389,11 @@
         const gzEl = document.getElementById("gz");
         const tsEl = document.getElementById("ts");
         const sourceEl = document.getElementById("source");
+        const statusEl = document.getElementById("status");
 
         let bleDevice = null;
         let txChar = null;
+        let currentMode = null;
 
         let sensors = { gyro: null, accel: null };
         let lastReading = { ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0 };
@@ -276,22 +402,28 @@
 
         const fmt = (v, n = 2) => (typeof v === "number" ? v.toFixed(n) : "—");
 
+        // Bluetooth Functions
         async function toggleBluetooth() {
           if (bleDevice && bleDevice.gatt.connected) {
             await bleDevice.gatt.disconnect();
             btToggleBtn.textContent = "Bluetooth: OFF";
             btToggleBtn.classList.remove("active");
+            statusEl.textContent = "STATUS : BT DISCONNECTED";
+            updateCtrlBtStatus("Disconnected", "—");
             bleDevice = null;
             txChar = null;
           } else {
             try {
               btToggleBtn.textContent = "Connecting...";
+              statusEl.textContent = "STATUS : BT CONNECTING";
               const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
               });
               device.addEventListener("gattserverdisconnected", () => {
                 btToggleBtn.textContent = "Bluetooth: OFF";
                 btToggleBtn.classList.remove("active");
+                statusEl.textContent = "STATUS : BT DISCONNECTED";
+                updateCtrlBtStatus("Disconnected", "—");
                 bleDevice = null;
                 txChar = null;
               });
@@ -315,13 +447,36 @@
               bleDevice = device;
               btToggleBtn.textContent = "Bluetooth: ON";
               btToggleBtn.classList.add("active");
+              statusEl.textContent = "STATUS : BT CONNECTED";
+              updateCtrlBtStatus("Connected", device.name || "Unknown Device");
             } catch (error) {
               alert("Bluetooth connection failed: " + error.message);
               btToggleBtn.textContent = "Bluetooth: OFF";
+              statusEl.textContent = "STATUS : BT FAILED";
             }
           }
         }
 
+        function updateCtrlBtStatus(status, device) {
+          document.getElementById("ctrlBtStatus").textContent = status;
+          document.getElementById("ctrlBtDevice").textContent = device;
+        }
+
+        function sendCommand(command) {
+          if (txChar && bleDevice && bleDevice.gatt.connected) {
+            try {
+              const data = new TextEncoder().encode(command);
+              txChar.writeValue(data);
+              console.log("Sent:", command);
+            } catch (error) {
+              console.error("Failed to send command:", error);
+            }
+          } else {
+            console.log("Would send:", command, "(BT not connected)");
+          }
+        }
+
+        // Sensor Functions
         function updateUIToggles() {
           gyroToggle.textContent = `Gyro: ${uiState.gyroOn ? "ON" : "OFF"}`;
           accelToggle.textContent = `Accel: ${uiState.accelOn ? "ON" : "OFF"}`;
@@ -348,7 +503,7 @@
             moveY += lastReading.ay;
           }
           if (uiState.gyroOn) {
-            moveX += lastReading.gx * 5; // Gyro values need scaling
+            moveX += lastReading.gx * 5;
             moveY += lastReading.gy * 5;
           }
 
@@ -356,7 +511,7 @@
           const sy = Math.max(-1, Math.min(1, moveY / 9.81));
 
           dot.style.left = `${cx + sx * (rect.width / 2 - 30)}px`;
-          dot.style.top = `${cy - sy * (rect.height / 2 - 30)}px`; // Invert Y for natural movement
+          dot.style.top = `${cy - sy * (rect.height / 2 - 30)}px`;
         }
 
         async function startSensors() {
@@ -367,12 +522,12 @@
                   const acc = e.accelerationIncludingGravity;
                   const rot = e.rotationRate;
                   lastReading = {
-                    ax: acc.x,
-                    ay: acc.y,
-                    az: acc.z,
-                    gx: rot.beta,
-                    gy: rot.alpha,
-                    gz: rot.gamma,
+                    ax: acc.x || 0,
+                    ay: acc.y || 0,
+                    az: acc.z || 0,
+                    gx: rot.beta || 0,
+                    gy: rot.alpha || 0,
+                    gz: rot.gamma || 0,
                   };
                   updateReadouts();
                 };
@@ -383,6 +538,7 @@
                 }
                 window.addEventListener("devicemotion", dmListener);
                 sourceEl.textContent = "DeviceMotion";
+                statusEl.textContent = "STATUS : SENSORS ON (DeviceMotion)";
               } else {
                 throw new Error("Sensor APIs not supported.");
               }
@@ -405,11 +561,13 @@
               });
               await sensors.gyro.start();
               sourceEl.textContent = "Generic Sensor";
+              statusEl.textContent = "STATUS : SENSORS ON (Generic API)";
             }
             uiState.sensorsRunning = true;
           } catch (error) {
             alert(`Could not start sensors: ${error.message}`);
             uiState.sensorsRunning = false;
+            statusEl.textContent = "STATUS : SENSOR ERROR";
           }
         }
 
@@ -422,6 +580,7 @@
           dmListener = null;
           uiState.sensorsRunning = false;
           resetReadouts();
+          statusEl.textContent = "STATUS : SENSORS OFF";
         }
 
         function updateReadouts() {
@@ -441,6 +600,44 @@
           gxEl.textContent = gyEl.textContent = gzEl.textContent = "—";
         }
 
+        // CTRL Mode Functions
+        function showCtrlPanel() {
+          mainContainer.style.display = "none";
+          ctrlPanel.style.display = "block";
+        }
+
+        function showMainPanel() {
+          ctrlPanel.style.display = "none";
+          mainContainer.style.display = "block";
+        }
+
+        function selectMode(mode) {
+          currentMode = mode;
+          document.querySelectorAll(".mode-btn").forEach((btn) => {
+            btn.classList.remove("selected");
+          });
+          document
+            .querySelector(`[data-mode="${mode}"]`)
+            .classList.add("selected");
+
+          const modeNames = [
+            "Sleep",
+            "RC Mode",
+            "Obstacle Avoidance",
+            "Line Follower",
+          ];
+          document.getElementById("activeMode").textContent =
+            modeNames[mode] || "Unknown";
+
+          // Show/hide RC controls
+          document.getElementById("rcSection").style.display =
+            mode === 1 ? "block" : "none";
+
+          // Send mode command
+          sendCommand(mode.toString());
+        }
+
+        // Event Listeners
         btToggleBtn.addEventListener("click", toggleBluetooth);
         gyroToggle.addEventListener("click", () => {
           uiState.gyroOn = !uiState.gyroOn;
@@ -449,6 +646,28 @@
         accelToggle.addEventListener("click", () => {
           uiState.accelOn = !uiState.accelOn;
           updateUIToggles();
+        });
+
+        ctrlModeBtn.addEventListener("click", showCtrlPanel);
+        backHomeBtn.addEventListener("click", showMainPanel);
+
+        // Mode button event listeners
+        document.querySelectorAll(".mode-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const mode = parseInt(btn.dataset.mode);
+            selectMode(mode);
+          });
+        });
+
+        // RC button event listeners
+        document.querySelectorAll(".rc-btn").forEach((btn) => {
+          btn.addEventListener("mousedown", () => {
+            sendCommand(btn.dataset.cmd);
+          });
+          btn.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            sendCommand(btn.dataset.cmd);
+          });
         });
 
         // Initial setup
